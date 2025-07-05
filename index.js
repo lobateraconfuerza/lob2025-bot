@@ -94,7 +94,7 @@ app.listen(PORT, () => {
 
 async function buscarElectorPorCedula(cedula) {
   const cedulaNumerica = parseInt(cedula, 10);
-  const url = `${process.env.SUPABASE_URL}/rest/v1/electores?cedula=eq.${cedulaNumerica}`;
+  const url = `${process.env.SUPABASE_URL}/rest/v1/datos?cedula=eq.${cedulaNumerica}`;
 
   const response = await fetch(url, {
     method: 'GET',
