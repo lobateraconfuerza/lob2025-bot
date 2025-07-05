@@ -91,8 +91,11 @@ app.listen(PORT, () => {
 });
 
 // 🔍 Supabase: Buscar elector
+
 async function buscarElectorPorCedula(cedula) {
-  const url = `${process.env.SUPABASE_URL}/rest/v1/electores?cedula=eq.${cedula}`;
+  const cedulaNumerica = parseInt(cedula, 10);
+  const url = `${process.env.SUPABASE_URL}/rest/v1/electores?cedula=eq.${cedulaNumerica}`;
+
   const response = await fetch(url, {
     method: 'GET',
     headers: {
@@ -103,7 +106,13 @@ async function buscarElectorPorCedula(cedula) {
   });
 
   const data = await response.json();
-  return data.length > 0 ? data[0] : null;
+  const elector = data.length > 0 ? data[0] : null;
+
+  if (!elector) {
+    console.log('⚠️ Cédula no encontrada. Tipo en Supabase:', typeof cedulaNumerica, '→ valor:', cedulaNumerica);
+  }
+
+  return elector;
 }
 
 // 🧠 Enviar mensaje
