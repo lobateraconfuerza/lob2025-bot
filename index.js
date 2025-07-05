@@ -81,7 +81,7 @@ app.post('/', async (req, res) => {
     }
   }
 
-  // 📥 Manejo de botones
+  // 📥 Manejo de botones interactivos
   if (body.callback_query) {
     const callback = body.callback_query;
     const chatId = callback.message.chat.id;
@@ -105,7 +105,7 @@ app.post('/', async (req, res) => {
   res.sendStatus(200);
 });
 
-// 🖥️ Ruta para Render
+// 🖥️ Ruta de salud para Render
 app.get('/', (req, res) => {
   res.send('Bot Lobatera está activo 🟢');
 });
@@ -115,7 +115,7 @@ app.listen(PORT, () => {
   console.log(`Bot Lobatera activo en puerto ${PORT}`);
 });
 
-// 🔎 Supabase: Buscar elector
+// 🔍 Buscar elector por cédula en Supabase
 async function buscarElectorPorCedula(cedula) {
   const url = `${process.env.SUPABASE_URL}/rest/v1/electores?cedula=eq.${cedula}`;
 
@@ -132,7 +132,7 @@ async function buscarElectorPorCedula(cedula) {
   return data.length > 0 ? data[0] : null;
 }
 
-// 📆 Calcular edad
+// 📆 Calcular edad a partir de la fecha de nacimiento
 function calcularEdad(fechanac) {
   const nacimiento = new Date(fechanac);
   const hoy = new Date();
