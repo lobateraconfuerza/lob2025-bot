@@ -91,8 +91,6 @@ await fetch(`${TELEGRAM_API}/sendMessage`, {
   })
 });
 
-}
-
 // 🖥️ Puerto en Render
 app.get('/', (req, res) => {
   res.send('Bot Lobatera está activo 🟢');
