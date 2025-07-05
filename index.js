@@ -85,6 +85,33 @@ app.post('/', async (req, res) => {
 
 // 🧠 Procesar cédula y mostrar botones
 async function procesarCedula(chatId, tipo, cedula) {
+  const cedulaNumerica = parseInt(cedula, 10);
+
+  // 🔍 Verificamos si ya participó
+  const urlVerificar = `${process.env.SUPABASE_URL}/rest/v1/participacion_bot?cedula=eq.${cedulaNumerica}&select=id`;
+
+  try {
+    const verificar = await fetch(urlVerificar, {
+      method: 'GET',
+      headers: {
+        'apikey': process.env.SUPABASE_KEY,
+        'Authorization': `Bearer ${process.env.SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const existe = await verificar.json();
+
+    // 🛑 Si ya respondió, no mostramos botones
+    if (existe.length > 0) {
+      await enviarMensaje(chatId, `🙌 Ya registramos tu participación anteriormente.\n\n¡Gracias por ser parte activa de Lobatera con Fuerza!`);
+      return;
+    }
+  } catch (error) {
+    console.error('⚠️ Error al verificar participación previa:', error.message);
+  }
+
+  // 📋 Si no ha respondido, continuamos con el flujo normal
   const elector = await buscarElectorPorCedula(cedula);
 
   if (elector) {
