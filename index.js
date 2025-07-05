@@ -23,6 +23,7 @@ app.post('/', async (req, res) => {
 
     console.log('📩 Mensaje recibido:', text);
     console.log('🆔 Chat ID:', chatId);
+    console.log('👤 Usuario Telegram:', message.from?.first_name, message.from?.last_name, `(@${message.from?.username})`);
 
     if (text.startsWith('/start')) {
       const partes = text.split(' ');
@@ -66,10 +67,10 @@ app.post('/', async (req, res) => {
     const respuesta = callback.data;
     const [opcion, cedula] = respuesta.split(':');
 
-    console.log('📥 Respuesta recibida:', opcion, 'para la cédula', cedula);
-
-    // Aquí puedes guardar en Supabase si quieres:
-    // await registrarDecision(cedula, opcion, chatId);
+    console.log('📥 Respuesta recibida:', opcion);
+    console.log('🆔 Chat ID:', chatId);
+    console.log('🧾 Cédula asociada a respuesta:', cedula);
+    console.log('👤 Usuario Telegram:', callback.from?.first_name, callback.from?.last_name, `(@${callback.from?.username})`);
 
     const texto = `✅ Registramos tu respuesta: *${opcion === 'si' ? 'Sí' : opcion === 'nose' ? 'No sé' : 'No'}*`;
     await enviarMensaje(chatId, texto, 'Markdown');
@@ -87,35 +88,40 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Bot Lobatera activo en puerto ${PORT}`);
+  console.log(`🚀 Bot Lobatera activo en puerto ${PORT}`);
 });
 
-// 🔍 Supabase: Buscar elector
-
+// 🔍 Supabase: Buscar elector por cédula
 async function buscarElectorPorCedula(cedula) {
   const cedulaNumerica = parseInt(cedula, 10);
   const url = `${process.env.SUPABASE_URL}/rest/v1/datos?cedula=eq.${cedulaNumerica}`;
+  console.log('🔗 Consultando Supabase URL:', url);
 
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'apikey': process.env.SUPABASE_KEY,
-      'Authorization': `Bearer ${process.env.SUPABASE_KEY}`,
-      'Content-Type': 'application/json'
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'apikey': process.env.SUPABASE_KEY,
+        'Authorization': `Bearer ${process.env.SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const data = await response.json();
+    const elector = data.length > 0 ? data[0] : null;
+
+    if (!elector) {
+      console.log('⚠️ Cédula no encontrada. Tipo en Supabase:', typeof cedulaNumerica, '→ valor:', cedulaNumerica);
     }
-  });
 
-  const data = await response.json();
-  const elector = data.length > 0 ? data[0] : null;
-
-  if (!elector) {
-    console.log('⚠️ Cédula no encontrada. Tipo en Supabase:', typeof cedulaNumerica, '→ valor:', cedulaNumerica);
+    return elector;
+  } catch (error) {
+    console.error('💥 Error al consultar Supabase:', error.message);
+    return null;
   }
-
-  return elector;
 }
 
-// 🧠 Enviar mensaje
+// 🧠 Enviar mensaje con logs y manejo de errores
 async function enviarMensaje(chatId, texto, modo = null, botones = null) {
   const payload = {
     chat_id: chatId,
@@ -124,14 +130,27 @@ async function enviarMensaje(chatId, texto, modo = null, botones = null) {
   if (modo) payload.parse_mode = modo;
   if (botones) payload.reply_markup = botones;
 
-  await fetch(`${TELEGRAM_API}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
+  console.log('📤 Preparando mensaje a Telegram:', JSON.stringify(payload));
+
+  try {
+    const response = await fetch(`${TELEGRAM_API}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+    console.log('✅ Telegram respondió:', JSON.stringify(result));
+
+    if (!result.ok) {
+      console.error('🚨 Telegram no envió el mensaje. Error:', result.description);
+    }
+  } catch (error) {
+    console.error('💥 Error al intentar enviar mensaje a Telegram:', error.message);
+  }
 }
 
-// 📆 Calcular edad
+// 📆 Calcular edad a partir de fecha de nacimiento
 function calcularEdad(fechanac) {
   const nacimiento = new Date(fechanac);
   const hoy = new Date();
