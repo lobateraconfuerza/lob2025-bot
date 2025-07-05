@@ -4,11 +4,7 @@ import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 dotenv.config();
 
-//BOT_TOKEN 
-//BASE_URL 
-//SUPABASE_
-//SUPABASE_KEY 
-
+// 🟢 Configuración inicial
 const app = express();
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.BOT_TOKEN}`;
 
@@ -17,34 +13,30 @@ app.use(bodyParser.json());
 
 // 🚪 Webhook principal
 app.post('/', async (req, res) => {
-  console.log('🧾 Entrada recibida del webhook:', JSON.stringify(req.body));
   const body = req.body;
 
-  // ✅ Mensaje original o editado
+  // ✅ Manejo de mensajes normales o editados
   if (body.message || body.edited_message) {
     const message = body.message || body.edited_message;
     const chatId = message.chat.id;
     const text = message.text?.trim();
-
-    console.log('📩 Mensaje recibido:', text);
-    console.log('🆔 Chat ID:', chatId);
-    console.log('👤 Usuario Telegram:', message.from?.first_name, message.from?.last_name, `(@${message.from?.username})`);
+    const user = message.from;
 
     if (text.startsWith('/start')) {
       const partes = text.split(' ');
       const cedula = partes[1];
 
-      if (!cedula) {
-        await enviarMensaje(chatId, '⚠️ Por favor incluya su cédula después de /start. Ejemplo: `/start 12345678`', 'Markdown');
+      if (!cedula || !/^\d+$/.test(cedula)) {
+        const mensaje = `👋 Bienvenido al *Bot Lobatera con Fuerza*\n\nPara comenzar, escribe tu cédula después del comando:\n\nEjemplo: \`/start 12345678\`\n\nEstamos construyendo comunidad con tecnología y convicción 🇻🇪`;
+        await enviarMensaje(chatId, mensaje, 'Markdown');
         return res.sendStatus(200);
       }
 
       const elector = await buscarElectorPorCedula(cedula);
-      console.log('🔎 Elector encontrado:', elector);
 
       if (elector) {
         const edad = calcularEdad(elector.fechanac);
-        const texto = `🗳️ *${elector.elector}* (${cedula})\n🏫 Centro: *${elector.nombre_centro}*\n🎂 Edad: *${edad} años*\n\n¿Estás dispuesto a acompañar este proceso electoral?`;
+        const texto = `🗳️ *${limpiarTextoMarkdown(elector.elector)}* (${cedula})\n🏫 Centro: *${limpiarTextoMarkdown(elector.nombre_centro)}*\n🎂 Edad: *${edad} años*\n\n¿Estás dispuesto a acompañar este proceso electoral?`;
 
         const botones = {
           inline_keyboard: [
@@ -65,20 +57,24 @@ app.post('/', async (req, res) => {
     }
   }
 
-  // 📥 Manejo de respuestas con botones
+  // 📥 Manejo de botones de participación
   if (body.callback_query) {
     const callback = body.callback_query;
     const chatId = callback.message.chat.id;
+    const messageId = callback.message.message_id;
     const respuesta = callback.data;
     const [opcion, cedula] = respuesta.split(':');
 
-    console.log('📥 Respuesta recibida:', opcion);
-    console.log('🆔 Chat ID:', chatId);
-    console.log('🧾 Cédula asociada a respuesta:', cedula);
-    console.log('👤 Usuario Telegram:', callback.from?.first_name, callback.from?.last_name, `(@${callback.from?.username})`);
+    const estado = await registrarDecision(cedula, opcion, chatId);
+    await eliminarBotones(chatId, messageId);
 
-    const texto = `✅ Registramos tu respuesta: *${opcion === 'si' ? 'Sí' : opcion === 'nose' ? 'No sé' : 'No'}*`;
-    await enviarMensaje(chatId, texto, 'Markdown');
+    if (estado === 'duplicado') {
+      await enviarMensaje(chatId, `🙌 Ya registramos tu participación anteriormente.\n\n¡Gracias por ser parte activa de Lobatera con Fuerza!`);
+    } else if (estado === 'registrado') {
+      await enviarMensaje(chatId, `✅ Registramos tu respuesta: *${opcion === 'si' ? 'Sí' : opcion === 'nose' ? 'No sé' : 'No'}*\n\n🎉 ¡Ya formas parte de este gran equipo de Lobatera con Fuerza!`, 'Markdown');
+    } else {
+      await enviarMensaje(chatId, `💥 Hubo un error registrando tu respuesta. Intenta de nuevo más tarde.`);
+    }
 
     return res.sendStatus(200);
   }
@@ -96,11 +92,10 @@ app.listen(PORT, () => {
   console.log(`🚀 Bot Lobatera activo en puerto ${PORT}`);
 });
 
-// 🔍 Supabase: Buscar elector por cédula
+// 🔍 Buscar elector por cédula en Supabase
 async function buscarElectorPorCedula(cedula) {
   const cedulaNumerica = parseInt(cedula, 10);
   const url = `${process.env.SUPABASE_URL}/rest/v1/datos?cedula=eq.${cedulaNumerica}`;
-  console.log('🔗 Consultando Supabase URL:', url);
 
   try {
     const response = await fetch(url, {
@@ -113,29 +108,78 @@ async function buscarElectorPorCedula(cedula) {
     });
 
     const data = await response.json();
-    const elector = data.length > 0 ? data[0] : null;
-
-    if (!elector) {
-      console.log('⚠️ Cédula no encontrada. Tipo en Supabase:', typeof cedulaNumerica, '→ valor:', cedulaNumerica);
-    }
-
-    return elector;
+    return data.length > 0 ? data[0] : null;
   } catch (error) {
     console.error('💥 Error al consultar Supabase:', error.message);
     return null;
   }
 }
 
-// 🧠 Enviar mensaje con logs y manejo de errores
+// 🛡️ Validar y registrar participación
+async function registrarDecision(cedula, respuesta, chatId) {
+  const cedulaNumerica = parseInt(cedula, 10);
+  const urlVerificar = `${process.env.SUPABASE_URL}/rest/v1/participacion_bot?cedula=eq.${cedulaNumerica}&select=id`;
+  const urlInsertar = `${process.env.SUPABASE_URL}/rest/v1/participacion_bot`;
+
+  try {
+    const verificar = await fetch(urlVerificar, {
+      method: 'GET',
+      headers: {
+        'apikey': process.env.SUPABASE_KEY,
+        'Authorization': `Bearer ${process.env.SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const existe = await verificar.json();
+    if (existe.length > 0) return 'duplicado';
+
+    const payload = {
+      cedula: cedulaNumerica,
+      respuesta: respuesta,
+      chat_id: chatId
+    };
+
+    const insertar = await fetch(urlInsertar, {
+      method: 'POST',
+      headers: {
+        'apikey': process.env.SUPABASE_KEY,
+        'Authorization': `Bearer ${process.env.SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    await insertar.json();
+    return 'registrado';
+  } catch (error) {
+    console.error('💥 Error en registrarDecision:', error.message);
+    return 'error';
+  }
+}
+
+// 🧼 Eliminar botones
+async function eliminarBotones(chatId, messageId) {
+  try {
+    await fetch(`${TELEGRAM_API}/editMessageReplyMarkup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: { inline_keyboard: [] }
+      })
+    });
+  } catch (error) {
+    console.error('💥 Error al eliminar botones:', error.message);
+  }
+}
+
+// 📤 Enviar mensaje a Telegram
 async function enviarMensaje(chatId, texto, modo = null, botones = null) {
-  const payload = {
-    chat_id: chatId,
-    text: texto
-  };
+  const payload = { chat_id: chatId, text: texto };
   if (modo) payload.parse_mode = modo;
   if (botones) payload.reply_markup = botones;
-
-  console.log('📤 Preparando mensaje a Telegram:', JSON.stringify(payload));
 
   try {
     const response = await fetch(`${TELEGRAM_API}/sendMessage`, {
@@ -145,17 +189,15 @@ async function enviarMensaje(chatId, texto, modo = null, botones = null) {
     });
 
     const result = await response.json();
-    console.log('✅ Telegram respondió:', JSON.stringify(result));
-
     if (!result.ok) {
       console.error('🚨 Telegram no envió el mensaje. Error:', result.description);
     }
   } catch (error) {
-    console.error('💥 Error al intentar enviar mensaje a Telegram:', error.message);
+    console.error('💥 Error al enviar mensaje:', error.message);
   }
 }
 
-// 📆 Calcular edad a partir de fecha de nacimiento
+// 🗓️ Calcular edad desde fecha de nacimiento
 function calcularEdad(fechanac) {
   const nacimiento = new Date(fechanac);
   const hoy = new Date();
@@ -163,4 +205,12 @@ function calcularEdad(fechanac) {
   const m = hoy.getMonth() - nacimiento.getMonth();
   if (m < 0 || (m === 0 && hoy.getDate() < nacimiento.getDate())) edad--;
   return edad;
+}
+
+// ✨ Limpiar texto para evitar errores en Markdown
+function limpiarTextoMarkdown(texto) {
+  return texto
+    .replace(/[*_`\[\]]/g, '')
+    .replace(/</g, '‹')
+    .replace(/>/g, '›');
 }
