@@ -4,6 +4,11 @@ import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 dotenv.config();
 
+//BOT_TOKEN 
+//BASE_URL 
+//SUPABASE_
+//SUPABASE_KEY 
+
 const app = express();
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.BOT_TOKEN}`;
 
