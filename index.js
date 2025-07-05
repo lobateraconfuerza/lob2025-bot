@@ -8,52 +8,96 @@ const app = express();
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.BOT_TOKEN}`;
 
 app.use('/favicon.ico', express.static('favicon.ico'));
-
 app.use(bodyParser.json());
 
-// 🚪 Endpoint de entrada del webhook
+// 🚪 Endpoint principal del webhook
 app.post('/', async (req, res) => {
-  const message = req.body?.message;
-  const chatId = message?.chat?.id;
-  const text = message?.text;
+  const body = req.body;
 
-  if (!chatId || !text) return res.sendStatus(200);
+  // 🟢 Manejo de /start con cédula
+  if (body.message) {
+    const message = body.message;
+    const chatId = message.chat.id;
+    const text = message.text?.trim();
 
-  console.log('📩 Mensaje recibido:', text);
-  console.log('🆔 Chat ID:', chatId);
+    console.log('📩 Mensaje recibido:', text);
+    console.log('🆔 Chat ID:', chatId);
 
-  if (text.startsWith('/start')) {
-    const partes = text.split(' ');
-    const cedula = partes[1];
+    if (text.startsWith('/start')) {
+      const partes = text.split(' ');
+      const cedula = partes[1];
 
-    if (!cedula) {
-      await fetch(`${TELEGRAM_API}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: '⚠️ Por favor incluya su cédula después de /start. Ejemplo: `/start 12345678`',
-          parse_mode: 'Markdown'
-        })
-      });
+      if (!cedula) {
+        await fetch(`${TELEGRAM_API}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: '⚠️ Por favor incluya su cédula después de /start. Ejemplo: `/start 12345678`',
+            parse_mode: 'Markdown'
+          })
+        });
+        return res.sendStatus(200);
+      }
+
+      const elector = await buscarElectorPorCedula(cedula);
+
+      if (elector) {
+        const edad = calcularEdad(elector.fechanac);
+        const texto = `🗳️ *${elector.elector}* (${cedula})\n🏫 Centro: *${elector.nombre_centro}*\n🎂 Edad: *${edad} años*\n\n¿Estás dispuesto a acompañar este proceso electoral?`;
+
+        const botones = {
+          inline_keyboard: [
+            [
+              { text: '✅ Sí', callback_data: 'si' },
+              { text: '🤔 No sé', callback_data: 'nose' },
+              { text: '❌ No', callback_data: 'no' }
+            ]
+          ]
+        };
+
+        await fetch(`${TELEGRAM_API}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: texto,
+            parse_mode: 'Markdown',
+            reply_markup: botones
+          })
+        });
+      } else {
+        await fetch(`${TELEGRAM_API}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: `😕 No encontré al elector con cédula ${cedula}. Verifique si está registrado.`
+          })
+        });
+      }
+
       return res.sendStatus(200);
     }
+  }
 
-    const elector = await buscarElectorPorCedula(cedula);
+  // 📥 Manejo de botones
+  if (body.callback_query) {
+    const callback = body.callback_query;
+    const chatId = callback.message.chat.id;
+    const respuesta = callback.data;
 
-    if (elector) {
-      const edad = calcularEdad(elector.fechanac);
-      await enviarPreguntaPersonalizada(chatId, elector.elector, elector.cedula, elector.nombre_centro, edad);
-    } else {
-      await fetch(`${TELEGRAM_API}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: `😕 No encontré al elector con cédula ${cedula}. Verifique si está registrado.`
-        })
-      });
-    }
+    console.log('📥 Respuesta recibida:', respuesta);
+
+    await fetch(`${TELEGRAM_API}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: `✅ Registramos tu respuesta: *${respuesta === 'si' ? 'Sí' : respuesta === 'nose' ? 'No sé' : 'No'}*`,
+        parse_mode: 'Markdown'
+      })
+    });
 
     return res.sendStatus(200);
   }
@@ -61,37 +105,7 @@ app.post('/', async (req, res) => {
   res.sendStatus(200);
 });
 
-// 🧠 Función que envía la encuesta personalizada
-
-await fetch(`${TELEGRAM_API}/sendMessage`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    chat_id: msg.chat.id,
-    text: '👋 ¡Hola, bienvenido!',
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: '✅ Sí', callback_data: 'si' },
-          { text: '🤔 No sé', callback_data: 'nose' },
-          { text: '❌ No', callback_data: 'no' }
-        ]
-      ]
-    }
-  })
-});
-
-await fetch(`${TELEGRAM_API}/sendMessage`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    chat_id: chatId,
-    text: pregunta, // Sin Markdown
-    reply_markup: botones
-  })
-});
-
-// 🖥️ Puerto en Render
+// 🖥️ Ruta para Render
 app.get('/', (req, res) => {
   res.send('Bot Lobatera está activo 🟢');
 });
@@ -101,6 +115,7 @@ app.listen(PORT, () => {
   console.log(`Bot Lobatera activo en puerto ${PORT}`);
 });
 
+// 🔎 Supabase: Buscar elector
 async function buscarElectorPorCedula(cedula) {
   const url = `${process.env.SUPABASE_URL}/rest/v1/electores?cedula=eq.${cedula}`;
 
@@ -117,6 +132,7 @@ async function buscarElectorPorCedula(cedula) {
   return data.length > 0 ? data[0] : null;
 }
 
+// 📆 Calcular edad
 function calcularEdad(fechanac) {
   const nacimiento = new Date(fechanac);
   const hoy = new Date();
