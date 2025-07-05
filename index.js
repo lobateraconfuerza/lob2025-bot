@@ -12,6 +12,8 @@ app.use(bodyParser.json());
 
 // 🚪 Endpoint principal del webhook
 app.post('/', async (req, res) => {
+  console.log('🧾 Entrada recibida del webhook:', JSON.stringify(req.body));
+
   const body = req.body;
 
   // 🟢 Manejo de /start con cédula
