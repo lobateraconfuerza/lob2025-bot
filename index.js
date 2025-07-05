@@ -7,6 +7,8 @@ dotenv.config();
 const app = express();
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.BOT_TOKEN}`;
 
+app.use('/favicon.ico', express.static('favicon.ico'));
+
 app.use(bodyParser.json());
 
 // 🚪 Endpoint de entrada del webhook
@@ -60,37 +62,34 @@ app.post('/', async (req, res) => {
 });
 
 // 🧠 Función que envía la encuesta personalizada
-async function enviarPreguntaPersonalizada(chatId, nombre, cedula, centro, edad) {
-  const pregunta = `📌 Usted elector *${nombre}*, de cédula *${cedula}*, con *${edad} años*, registrado en el centro electoral *${centro}*, ¿acompañaría el próximo *12 de septiembre de 2025* al equipo de Lobatera con Fuerza?\n\n⬇️ Por favor seleccione una opción:`;
 
-  const botones = {
-    inline_keyboard: [[
-      { text: '✅ Sí', callback_data: 'SI' },
-      { text: '🤔 No sé', callback_data: 'NO_SE' },
-      { text: '❌ No', callback_data: 'NO' }
-    ]]
-  };
+await fetch(`${TELEGRAM_API}/sendMessage`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    chat_id: msg.chat.id,
+    text: '👋 ¡Hola, bienvenido!',
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: '✅ Sí', callback_data: 'si' },
+          { text: '🤔 No sé', callback_data: 'nose' },
+          { text: '❌ No', callback_data: 'no' }
+        ]
+      ]
+    }
+  })
+});
 
-  //await fetch(`${TELEGRAM_API}/sendMessage`, {
-  //  method: 'POST',
-  //  headers: { 'Content-Type': 'application/json' },
-  //  body: JSON.stringify({
-  //    chat_id: chatId,
-  //    text: pregunta,
-  //    reply_markup: botones,
-  //    parse_mode: 'Markdown'
-  //  })
-  //});
-
-  await fetch(`${TELEGRAM_API}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: pregunta, // Sin Markdown
-      reply_markup: botones
-    })
-  });
+await fetch(`${TELEGRAM_API}/sendMessage`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    chat_id: chatId,
+    text: pregunta, // Sin Markdown
+    reply_markup: botones
+  })
+});
 
 }
 
