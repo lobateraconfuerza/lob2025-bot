@@ -5,6 +5,12 @@ import { obtenerDatosCrudos, calcularEdad, enviarArchivo } from './utils.js';
 export async function generarReporteGeneral(chatId) {
   const registros = await obtenerDatosCrudos();
 
+  registros.sort((a, b) => {
+    const centroA = a.datos?.nombre_centro ?? '';
+    const centroB = b.datos?.nombre_centro ?? '';
+    return centroA.localeCompare(centroB);
+  });
+
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Participación');
   sheet.columns = [
@@ -30,5 +36,6 @@ export async function generarReporteGeneral(chatId) {
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
+  console.log('📬 Enviando a chatId:', chatId);
   await enviarArchivo(chatId, buffer, 'reporte.xlsx');
 }
