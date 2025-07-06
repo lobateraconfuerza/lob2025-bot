@@ -52,10 +52,14 @@ export async function generarResumenPDF(chatId) {
   doc.text(`Fecha de emisión: ${new Date().toLocaleDateString()}`);
   doc.moveDown();
 
-  doc.text(`Total encuestados: ${total}`);
-  doc.text(`✅ Sí: ${totales.si} (${((totales.si / total) * 100).toFixed(1)}%)`);
-  doc.text(`🤔 No sé: ${totales.nose} (${((totales.nose / total) * 100).toFixed(1)}%)`);
-  doc.text(`❌ No: ${totales.no} (${((totales.no / total) * 100).toFixed(1)}%)`);
+  if (total > 0) {
+    doc.text(`Total encuestados: ${total}`);
+    doc.text(`✅ Sí: ${totales.si} (${((totales.si / total) * 100).toFixed(1)}%)`);
+    doc.text(`🤔 No sé: ${totales.nose} (${((totales.nose / total) * 100).toFixed(1)}%)`);
+    doc.text(`❌ No: ${totales.no} (${((totales.no / total) * 100).toFixed(1)}%)`);
+  } else {
+    doc.text('⚠️ No hay datos disponibles para mostrar el resumen.');
+  }
 
   doc.moveDown();
   doc.fontSize(10).text('Este resumen refleja la participación digital ciudadana organizada desde Lobatera + Fuerte.');
