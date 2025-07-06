@@ -8,7 +8,7 @@ export async function generarResumenPDF(chatId) {
   const registros = await obtenerDatosCrudos();
   if (!registros.length) return console.warn('⚠️ No hay registros');
 
-  // Agrupación
+  // Agrupación por parroquia y centro
   const agrupado = {};
   for (const r of registros) {
     const d = r.datos ?? {};
@@ -51,9 +51,9 @@ export async function generarResumenPDF(chatId) {
   }
 
   doc.font('Helvetica');
-  doc.fontSize(18).text('Lobatera + Fuerte 💪🇻🇪', { align: 'center' });
+  doc.fontSize(18).text('Lobatera + Fuerte', { align: 'center' });
   doc.moveDown();
-  doc.fontSize(12).text(`Informe de Participación por Centro de Votación`, { align: 'center' });
+  doc.fontSize(12).text('Informe de Participación por Centro de Votación', { align: 'center' });
   doc.text(`Fecha: ${new Date().toLocaleDateString()}`, { align: 'center' });
   doc.moveDown();
 
@@ -64,9 +64,15 @@ export async function generarResumenPDF(chatId) {
     doc.fontSize(14).text(`Parroquia: ${parroquia}`, { underline: true });
     doc.moveDown();
 
-    const centros = Object.entries(agrupado[parroquia]);
-    let count = 0;
+    const centros = Object.entries(agrupado[parroquia])
+      .filter(([, d]) => d.total > 0); // solo con encuestados
 
+    if (centros.length === 0) {
+      doc.fontSize(10).text('No se registraron encuestas en esta parroquia.');
+      continue;
+    }
+
+    let count = 0;
     for (let i = 0; i < centros.length; i++) {
       const [clave, datos] = centros[i];
       const [codCV, nombreCentro] = clave.split('||');
@@ -80,14 +86,14 @@ export async function generarResumenPDF(chatId) {
       const pctNose = total > 0 ? formato((nose / total) * 100) : '0.0';
       const pctNo = total > 0 ? formato((no / total) * 100) : '0.0';
 
-      doc.fontSize(9).text(`📌 Centro: ${nombreCentro}`, xBase, yBase);
+      doc.fontSize(9).text(`Centro de votación: ${nombreCentro}`, xBase, yBase);
       doc.text(`Código CV: ${codCV}`, xBase);
-      doc.text(`Electores: ${electores}`, xBase);
+      doc.text(`Electores registrados: ${electores}`, xBase);
       doc.text(`Encuestados: ${total}`, xBase);
-      doc.text(`% Participación: ${pctPart}%`, xBase);
-      doc.text(`✅ Sí: ${si} (${pctSi}%)`, xBase);
-      doc.text(`🤔 No sé: ${nose} (${pctNose}%)`, xBase);
-      doc.text(`❌ No: ${no} (${pctNo}%)`, xBase);
+      doc.text(`Participación: ${pctPart}%`, xBase);
+      doc.text(`Sí: ${si} (${pctSi}%)`, xBase);
+      doc.text(`No sé: ${nose} (${pctNose}%)`, xBase);
+      doc.text(`No: ${no} (${pctNo}%)`, xBase);
 
       totalElectores += electores;
       totalEncuestados += total;
@@ -101,7 +107,7 @@ export async function generarResumenPDF(chatId) {
 
     const subtotal = centros.reduce((acc, [, d]) => acc + d.total, 0);
     doc.moveDown();
-    doc.fontSize(10).text(`🧮 Subtotal de encuestados en ${parroquia}: ${subtotal}`);
+    doc.fontSize(10).text(`Subtotal de encuestados en la parroquia ${parroquia}: ${subtotal}`);
   }
 
   const globalPart = totalElectores > 0 ? formato((totalEncuestados / totalElectores) * 100) : '0.0';
@@ -112,12 +118,12 @@ export async function generarResumenPDF(chatId) {
   doc.addPage();
   doc.fontSize(12).text('Resumen Final Global', { underline: true });
   doc.moveDown();
-  doc.fontSize(10).text(`🧮 Total electores: ${totalElectores}`);
-  doc.text(`🧮 Total encuestados: ${totalEncuestados}`);
-  doc.text(`📈 % participación global: ${globalPart}%`);
-  doc.text(`✅ Sí: ${totalSi} (${globalSi}%)`);
-  doc.text(`🤔 No sé: ${totalNose} (${globalNose}%)`);
-  doc.text(`❌ No: ${totalNo} (${globalNo}%)`);
+  doc.fontSize(10).text(`Total electores: ${totalElectores}`);
+  doc.text(`Total encuestados: ${totalEncuestados}`);
+  doc.text(`Participación global: ${globalPart}%`);
+  doc.text(`Sí: ${totalSi} (${globalSi}%)`);
+  doc.text(`No sé: ${totalNose} (${globalNose}%)`);
+  doc.text(`No: ${totalNo} (${globalNo}%)`);
 
   doc.moveDown();
   doc.fontSize(8).text('Este informe refleja la participación ciudadana organizada desde Lobatera + Fuerte, agrupada por parroquia y centro de votación.');
