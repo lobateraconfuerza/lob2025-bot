@@ -8,14 +8,14 @@ export async function generarResumenPDF(chatId) {
   const registros = await obtenerDatosCrudos();
   if (!registros.length) return console.warn('⚠️ No hay registros');
 
-  // Agrupar por parroquia y centros
+  // Agrupación
   const agrupado = {};
   for (const r of registros) {
     const d = r.datos ?? {};
     const parroquia = d.parroquia ?? 'Sin parroquia';
     const centro = d.nombre_centro ?? 'Centro desconocido';
     const codCV = d.cod_cv ?? '';
-    const electores = d.electores ?? 0;
+    const electores = Number(d.electores) || 0;
 
     if (!agrupado[parroquia]) agrupado[parroquia] = {};
     const clave = `${codCV}||${centro}`;
@@ -62,7 +62,7 @@ export async function generarResumenPDF(chatId) {
   for (const parroquia in agrupado) {
     doc.addPage();
     doc.fontSize(14).text(`Parroquia: ${parroquia}`, { underline: true });
-    doc.moveDown(0.5);
+    doc.moveDown();
 
     const centros = Object.entries(agrupado[parroquia]);
     let count = 0;
@@ -73,12 +73,12 @@ export async function generarResumenPDF(chatId) {
       const { electores, total, si, nose, no } = datos;
 
       const xBase = count % 2 === 0 ? 50 : 300;
-      const yBase = 100 + Math.floor(count / 2) * 150;
+      const yBase = 100 + Math.floor(count / 2) % 2 * 220;
 
-      const pctPart = formato((total / electores) * 100);
-      const pctSi = formato((si / total) * 100);
-      const pctNose = formato((nose / total) * 100);
-      const pctNo = formato((no / total) * 100);
+      const pctPart = electores > 0 ? formato((total / electores) * 100) : '0.0';
+      const pctSi = total > 0 ? formato((si / total) * 100) : '0.0';
+      const pctNose = total > 0 ? formato((nose / total) * 100) : '0.0';
+      const pctNo = total > 0 ? formato((no / total) * 100) : '0.0';
 
       doc.fontSize(9).text(`📌 Centro: ${nombreCentro}`, xBase, yBase);
       doc.text(`Código CV: ${codCV}`, xBase);
@@ -99,17 +99,15 @@ export async function generarResumenPDF(chatId) {
       if (count % 4 === 0) doc.addPage();
     }
 
-    // Subtotales por parroquia
     const subtotal = centros.reduce((acc, [, d]) => acc + d.total, 0);
     doc.moveDown();
     doc.fontSize(10).text(`🧮 Subtotal de encuestados en ${parroquia}: ${subtotal}`);
   }
 
-  // Cierre global
-  const globalPart = formato((totalEncuestados / totalElectores) * 100);
-  const globalSi = formato((totalSi / totalEncuestados) * 100);
-  const globalNose = formato((totalNose / totalEncuestados) * 100);
-  const globalNo = formato((totalNo / totalEncuestados) * 100);
+  const globalPart = totalElectores > 0 ? formato((totalEncuestados / totalElectores) * 100) : '0.0';
+  const globalSi = totalEncuestados > 0 ? formato((totalSi / totalEncuestados) * 100) : '0.0';
+  const globalNose = totalEncuestados > 0 ? formato((totalNose / totalEncuestados) * 100) : '0.0';
+  const globalNo = totalEncuestados > 0 ? formato((totalNo / totalEncuestados) * 100) : '0.0';
 
   doc.addPage();
   doc.fontSize(12).text('Resumen Final Global', { underline: true });
