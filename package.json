@@ -2,6 +2,7 @@
   "name": "lob2025-bot",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js"
   },
@@ -9,7 +10,8 @@
     "express": "^4.18.2",
     "body-parser": "^1.20.2",
     "node-fetch": "^3.3.1",
-    "dotenv": "^16.3.1"
-  },
-  "type": "module"
+    "dotenv": "^16.3.1",
+    "exceljs": "^4.3.0",
+    "pdfkit": "^0.13.0"
+  }
 }
