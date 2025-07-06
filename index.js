@@ -53,8 +53,13 @@ app.post('/', async (req, res) => {
   // 📝 Mensajes de texto
   if (body.message || body.edited_message) {
     const message = body.message || body.edited_message;
-    const chatId = message.chat.id;
+    const chatId = message.chat?.id;
     const text = message.text?.trim();
+
+    if (!chatId || !text) {
+      console.error('🚫 chatId o texto no disponible');
+      return res.sendStatus(200);
+    }
 
     // 👉 /start con cédula
     if (text.startsWith('/start')) {
@@ -80,14 +85,14 @@ app.post('/', async (req, res) => {
 
     // 📊 Comando /reporte
     if (text.toLowerCase() === '/reporte') {
-      const archivo = await generarReporteGeneral();
-      await enviarArchivo(chatId, archivo.buffer, 'reporte.xlsx');
+      console.log('📬 Generando Excel para chatId:', chatId);
+      await generarReporteGeneral(chatId);
       return res.sendStatus(200);
     }
 
     // 📄 Comando /resumen
     if (text.toLowerCase() === '/resumen') {
-      const pdf = await generarResumenPDF();
+      console.log('📬 Generando PDF para chatId:', chatId);
       await generarResumenPDF(chatId);
       return res.sendStatus(200);
     }
@@ -96,11 +101,17 @@ app.post('/', async (req, res) => {
   // 🔘 Respuestas con botones
   if (body.callback_query) {
     const callback = body.callback_query;
-    const chatId = callback.message.chat.id;
-    const messageId = callback.message.message_id;
+    const chatId = callback.message?.chat?.id;
+    const messageId = callback.message?.message_id;
     const respuesta = callback.data;
+
+    if (!chatId || !messageId || !respuesta) {
+      console.error('🚫 Datos incompletos en callback');
+      return res.sendStatus(200);
+    }
+
     const [opcion, cedula] = respuesta.split(':');
-    const tipo = 'V'; // Por defecto, puedes adaptarlo si quieres registrar tipo
+    const tipo = 'V'; // Puedes adaptarlo si capturas el tipo en el frontend
 
     const estado = await registrarDecision(cedula, opcion, chatId);
     await eliminarBotones(chatId, messageId);

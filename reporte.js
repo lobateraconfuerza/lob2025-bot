@@ -3,7 +3,16 @@ import ExcelJS from 'exceljs';
 import { obtenerDatosCrudos, calcularEdad, enviarArchivo } from './utils.js';
 
 export async function generarReporteGeneral(chatId) {
+  if (!chatId) {
+    console.error('🚫 chatId no proporcionado para reporte Excel');
+    return;
+  }
+
   const registros = await obtenerDatosCrudos();
+  if (!registros.length) {
+    console.warn('⚠️ No se encontraron registros para generar el Excel');
+    return;
+  }
 
   registros.sort((a, b) => {
     const centroA = a.datos?.nombre_centro ?? '';
@@ -13,6 +22,7 @@ export async function generarReporteGeneral(chatId) {
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Participación');
+
   sheet.columns = [
     { header: 'Cédula', key: 'cedula', width: 15 },
     { header: 'Nombre', key: 'elector', width: 30 },
@@ -36,6 +46,6 @@ export async function generarReporteGeneral(chatId) {
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
-  console.log('📬 Enviando a chatId:', chatId);
+  console.log(`📤 Excel generado. Enviando a chatId: ${chatId}`);
   await enviarArchivo(chatId, buffer, 'reporte.xlsx');
 }

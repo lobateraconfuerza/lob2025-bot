@@ -13,9 +13,15 @@ export const headers = {
 
 // 📤 Enviar mensajes
 export async function enviarMensaje(chatId, texto, modo = null, botones = null) {
+  if (!chatId || !texto) {
+    console.error('🚫 Falta chatId o texto para enviarMensaje');
+    return;
+  }
+
   const payload = { chat_id: chatId, text: texto };
   if (modo) payload.parse_mode = modo;
   if (botones) payload.reply_markup = botones;
+
   try {
     const response = await fetch(`${TELEGRAM_API}/sendMessage`, {
       method: 'POST',
@@ -23,7 +29,9 @@ export async function enviarMensaje(chatId, texto, modo = null, botones = null) 
       body: JSON.stringify(payload)
     });
     const result = await response.json();
-    if (!result.ok) console.error('🚨 Telegram no envió mensaje:', result.description);
+    if (!result.ok) {
+      console.error('🚨 Telegram no envió mensaje:', result.description);
+    }
   } catch (error) {
     console.error('💥 Error al enviar mensaje:', error.message);
   }
@@ -31,11 +39,20 @@ export async function enviarMensaje(chatId, texto, modo = null, botones = null) 
 
 // 🧼 Eliminar botones
 export async function eliminarBotones(chatId, messageId) {
+  if (!chatId || !messageId) {
+    console.error('🚫 chatId o messageId faltante para eliminarBotones');
+    return;
+  }
+
   try {
     await fetch(`${TELEGRAM_API}/editMessageReplyMarkup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } })
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: { inline_keyboard: [] }
+      })
     });
   } catch (error) {
     console.error('💥 Error al eliminar botones:', error.message);
@@ -44,6 +61,7 @@ export async function eliminarBotones(chatId, messageId) {
 
 // 🎂 Calcular edad
 export function calcularEdad(fechanac) {
+  if (!fechanac) return 'N/A';
   const nacimiento = new Date(fechanac);
   const hoy = new Date();
   let edad = hoy.getFullYear() - nacimiento.getFullYear();
@@ -54,14 +72,24 @@ export function calcularEdad(fechanac) {
 
 // ✨ Limpiar texto Markdown
 export function limpiarTextoMarkdown(texto) {
-  return texto.replace(/[*_`\[\]]/g, '').replace(/</g, '‹').replace(/>/g, '›');
+  if (!texto) return '';
+  return texto
+    .replace(/[*_`\[\]]/g, '')
+    .replace(/</g, '‹')
+    .replace(/>/g, '›');
 }
 
 // 📤 Enviar archivo (Excel o PDF)
 export async function enviarArchivo(chatId, buffer, nombreArchivo) {
+  if (!chatId || !buffer || !nombreArchivo) {
+    console.error('🚫 Parámetros incompletos para enviarArchivo');
+    return;
+  }
+
   const form = new FormData();
   form.append('chat_id', chatId);
   form.append('document', buffer, { filename: nombreArchivo });
+
   try {
     const response = await fetch(`${TELEGRAM_API}/sendDocument`, {
       method: 'POST',
@@ -69,7 +97,9 @@ export async function enviarArchivo(chatId, buffer, nombreArchivo) {
       headers: form.getHeaders()
     });
     const result = await response.json();
-    if (!result.ok) console.error('🚨 Telegram no envió el archivo:', result.description);
+    if (!result.ok) {
+      console.error('🚨 Telegram no envió el archivo:', result.description);
+    }
   } catch (error) {
     console.error('💥 Error al enviar archivo:', error.message);
   }
@@ -77,7 +107,6 @@ export async function enviarArchivo(chatId, buffer, nombreArchivo) {
 
 // 📊 Consulta datos desde Supabase
 export async function obtenerDatosCrudos() {
-  //const url = `${process.env.SUPABASE_URL}/rest/v1/participacion_bot?select=cedula,respuesta,chat_id,datos(cedula,elector,fechanac,parroquia,nombre_centro)&order=datos.nombre_centro.asc`;
   const url = `${process.env.SUPABASE_URL}/rest/v1/participacion_bot?select=cedula,respuesta,chat_id,datos(cedula,elector,fechanac,parroquia,nombre_centro)`;
   try {
     const response = await fetch(url, { method: 'GET', headers });
