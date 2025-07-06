@@ -1,4 +1,4 @@
-// resumen.js – Resumen general con totales
+// resumen.js – Reporte técnico por centro de votación
 import PDFDocument from 'pdfkit';
 import { obtenerDatosCrudos, enviarArchivo } from './utils.js';
 import fs from 'fs';
@@ -15,32 +15,40 @@ export async function generarResumenPDF(chatId) {
     return;
   }
 
-  const totales = { si: 0, nose: 0, no: 0 };
+  // Agrupar por centro de votación
+  const mapa = new Map();
   for (const r of registros) {
+    const d = r.datos ?? {};
+    const centro = d.nombre_centro ?? 'Centro desconocido';
+    const parroquia = d.parroquia ?? 'Sin parroquia';
+    const codCV = d.cod_cv ?? ''; // solo si lo tienes en los datos
+    const key = `${parroquia}|${codCV}|${centro}`;
+
+    if (!mapa.has(key)) {
+      mapa.set(key, { total: 0, si: 0, nose: 0, no: 0 });
+    }
+
+    const actual = mapa.get(key);
+    actual.total++;
     const respuesta = r.respuesta?.toLowerCase();
-    if (totales.hasOwnProperty(respuesta)) totales[respuesta]++;
+    if (actual.hasOwnProperty(respuesta)) actual[respuesta]++;
   }
 
-  const total = totales.si + totales.nose + totales.no;
-  const doc = new PDFDocument({ autoFirstPage: false });
-  const buffers = [];
+  const formato = (v) => (isFinite(v) ? v.toFixed(1) : '0.0');
 
+  const doc = new PDFDocument({ size: 'A4', margin: 40 });
+  const buffers = [];
   doc.on('data', buffers.push.bind(buffers));
   doc.on('end', async () => {
     const pdfBuffer = Buffer.concat(buffers);
-    console.log(`📤 Resumen PDF generado. Enviando a chatId: ${chatId}`);
+    console.log(`📤 Resumen técnico PDF generado. Enviando a chatId: ${chatId}`);
     await enviarArchivo(chatId, pdfBuffer, 'resumen.pdf');
   });
 
-  // 🖼️ Insertar logo y configurar fuente
-  doc.addPage();
+  // 🖼️ Logo + encabezado institucional
   try {
     if (fs.existsSync('logo.png')) {
-      doc.image('logo.png', {
-        fit: [80, 80],
-        align: 'center',
-        valign: 'top'
-      });
+      doc.image('logo.png', { fit: [80, 80], align: 'center', valign: 'top' });
       doc.moveDown();
     }
   } catch (err) {
@@ -50,22 +58,31 @@ export async function generarResumenPDF(chatId) {
   doc.font('Helvetica');
   doc.fontSize(20).text('Lobatera + Fuerte 💪🇻🇪', { align: 'center' });
   doc.moveDown();
-  doc.fontSize(14).text('Resumen General de Participación');
+  doc.fontSize(14).text('Resumen Técnico por Centro de Votación');
   doc.text(`Fecha de emisión: ${new Date().toLocaleDateString()}`);
   doc.moveDown();
 
-  const formato = (v) => (isFinite(v) ? v.toFixed(1) : '0.0');
+  // 📊 Encabezado tipo tabla
+  doc.fontSize(9).text(
+    `# | PARROQUIA | CÓD. CV | CENTRO DE VOTACIÓN | ENCUESTADOS | % SÍ | % NO SÉ | % NO`,
+    { underline: true }
+  );
+  doc.moveDown(0.5);
 
-  if (total > 0) {
-    doc.text(`Total encuestados: ${total}`);
-    doc.text(`✅ Sí: ${totales.si} (${formato((totales.si / total) * 100)}%)`);
-    doc.text(`🤔 No sé: ${totales.nose} (${formato((totales.nose / total) * 100)}%)`);
-    doc.text(`❌ No: ${totales.no} (${formato((totales.no / total) * 100)}%)`);
-  } else {
-    doc.text('⚠️ No hay datos disponibles para mostrar el resumen.');
+  let index = 1;
+  for (const [key, datos] of mapa.entries()) {
+    const [parroquia, codCV, centro] = key.split('|');
+    const { total, si, nose, no } = datos;
+
+    const pctSi = formato((si / total) * 100);
+    const pctNose = formato((nose / total) * 100);
+    const pctNo = formato((no / total) * 100);
+
+    doc.text(`${index} | ${parroquia} | ${codCV} | ${centro} | ${total} | ${pctSi}% | ${pctNose}% | ${pctNo}%`);
+    index++;
   }
 
   doc.moveDown();
-  doc.fontSize(10).text('Este resumen refleja la participación digital ciudadana organizada desde Lobatera + Fuerte.');
+  doc.fontSize(8).text('Este reporte refleja la participación digital comunitaria organizada desde Lobatera + Fuerte.');
   doc.end();
 }
