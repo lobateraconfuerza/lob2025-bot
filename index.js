@@ -88,7 +88,7 @@ app.post('/', async (req, res) => {
     // 📄 Comando /resumen
     if (text.toLowerCase() === '/resumen') {
       const pdf = await generarResumenPDF();
-      await enviarArchivo(chatId, pdf.buffer, 'resumen.pdf');
+      await generarResumenPDF(chatId);
       return res.sendStatus(200);
     }
   }

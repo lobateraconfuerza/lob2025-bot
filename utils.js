@@ -77,7 +77,8 @@ export async function enviarArchivo(chatId, buffer, nombreArchivo) {
 
 // 📊 Consulta datos desde Supabase
 export async function obtenerDatosCrudos() {
-  const url = `${process.env.SUPABASE_URL}/rest/v1/participacion_bot?select=cedula,respuesta,chat_id,datos(cedula,elector,fechanac,parroquia,nombre_centro)&order=datos.nombre_centro.asc`;
+  //const url = `${process.env.SUPABASE_URL}/rest/v1/participacion_bot?select=cedula,respuesta,chat_id,datos(cedula,elector,fechanac,parroquia,nombre_centro)&order=datos.nombre_centro.asc`;
+  const url = `${process.env.SUPABASE_URL}/rest/v1/participacion_bot?select=cedula,respuesta,chat_id,datos(cedula,elector,fechanac,parroquia,nombre_centro)`;
   try {
     const response = await fetch(url, { method: 'GET', headers });
     const data = await response.json();
