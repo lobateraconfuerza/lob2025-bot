@@ -1,6 +1,7 @@
 // utils.js – Funciones de utilidad para el bot Lobatera + Fuerte
 import fetch from 'node-fetch';
 import dotenv from 'dotenv';
+import FormData from 'form-data';
 dotenv.config();
 
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.BOT_TOKEN}`;
@@ -60,4 +61,26 @@ export function limpiarTextoMarkdown(texto) {
     .replace(/[*_`\[\]]/g, '')
     .replace(/</g, '‹')
     .replace(/>/g, '›');
+}
+
+// 📤 Enviar archivo (Excel o PDF) al usuario
+export async function enviarArchivo(chatId, buffer, nombreArchivo) {
+  const form = new FormData();
+  form.append('chat_id', chatId);
+  form.append('document', buffer, { filename: nombreArchivo });
+
+  try {
+    const response = await fetch(`${TELEGRAM_API}/sendDocument`, {
+      method: 'POST',
+      body: form,
+      headers: form.getHeaders()
+    });
+
+    const result = await response.json();
+    if (!result.ok) {
+      console.error('🚨 Telegram no envió el archivo:', result.description);
+    }
+  } catch (error) {
+    console.error('💥 Error al enviar archivo:', error.message);
+  }
 }
