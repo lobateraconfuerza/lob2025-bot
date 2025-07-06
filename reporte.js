@@ -2,7 +2,7 @@
 import ExcelJS from 'exceljs';
 import { obtenerDatosCrudos, calcularEdad, enviarArchivo } from './utils.js';
 
-export async function generarReporteExcel(chatId) {
+export async function generarReporteGeneral(chatId) {
   const registros = await obtenerDatosCrudos();
 
   const workbook = new ExcelJS.Workbook();
