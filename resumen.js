@@ -22,7 +22,7 @@ export async function generarResumenPDF(chatId) {
   }
 
   const total = totales.si + totales.nose + totales.no;
-  const doc = new PDFDocument();
+  const doc = new PDFDocument({ autoFirstPage: false });
   const buffers = [];
 
   doc.on('data', buffers.push.bind(buffers));
@@ -32,7 +32,8 @@ export async function generarResumenPDF(chatId) {
     await enviarArchivo(chatId, pdfBuffer, 'resumen.pdf');
   });
 
-  // 🖼️ Insertar logo si existe
+  // 🖼️ Insertar logo y configurar fuente
+  doc.addPage();
   try {
     if (fs.existsSync('logo.png')) {
       doc.image('logo.png', {
@@ -46,17 +47,20 @@ export async function generarResumenPDF(chatId) {
     console.warn('⚠️ No se pudo insertar el logo:', err.message);
   }
 
+  doc.font('Helvetica');
   doc.fontSize(20).text('Lobatera + Fuerte 💪🇻🇪', { align: 'center' });
   doc.moveDown();
   doc.fontSize(14).text('Resumen General de Participación');
   doc.text(`Fecha de emisión: ${new Date().toLocaleDateString()}`);
   doc.moveDown();
 
+  const formato = (v) => (isFinite(v) ? v.toFixed(1) : '0.0');
+
   if (total > 0) {
     doc.text(`Total encuestados: ${total}`);
-    doc.text(`✅ Sí: ${totales.si} (${((totales.si / total) * 100).toFixed(1)}%)`);
-    doc.text(`🤔 No sé: ${totales.nose} (${((totales.nose / total) * 100).toFixed(1)}%)`);
-    doc.text(`❌ No: ${totales.no} (${((totales.no / total) * 100).toFixed(1)}%)`);
+    doc.text(`✅ Sí: ${totales.si} (${formato((totales.si / total) * 100)}%)`);
+    doc.text(`🤔 No sé: ${totales.nose} (${formato((totales.nose / total) * 100)}%)`);
+    doc.text(`❌ No: ${totales.no} (${formato((totales.no / total) * 100)}%)`);
   } else {
     doc.text('⚠️ No hay datos disponibles para mostrar el resumen.');
   }
