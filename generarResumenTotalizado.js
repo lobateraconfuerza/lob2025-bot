@@ -6,7 +6,7 @@ import supabase from './supabase.js'
 export async function generarResumenTotalizado() {
   console.log('🧠 Entrando a generarResumenTotalizado')
 
-  // ── BORRAR tabla anterior
+  // ── 1️⃣ Limpiar tabla resumen_totalizado
   const { error: errDel } = await supabase
     .from('resumen_totalizado')
     .delete()
@@ -16,7 +16,7 @@ export async function generarResumenTotalizado() {
     return
   }
 
-  // ── 1️⃣ Contar electores reales por centro y parroquia
+  // ── 2️⃣ Leer tabla datos para contar electores
   const { data: datos, error: errDatos } = await supabase
     .from('datos')
     .select('parroquia, codigo_centro, nombre_centro')
@@ -36,15 +36,15 @@ export async function generarResumenTotalizado() {
     electoresMap[pq][cc].electores++
   }
 
-  // ── 2️⃣ Contabilizar respuestas de encuesta por centro y parroquia
+  // ── 3️⃣ Leer respuestas de encuesta
   const respuestas = await obtenerDatosCrudos()
-  console.log(`📦 Votos obtenidos: ${respuestas.length}`)
+  console.log(`📦 Respuestas de encuesta recibidas: ${respuestas.length}`)
 
   // Estructura: { [parroquia]: { [codigo_centro]: { total, si, no, nose } } }
   const votosMap = {}
   for (const r of respuestas) {
-    const pq = r.datos.parroquia    ?? 'Sin parroquia'
-    const cc = r.datos.cod_cv       ?? 'sin-cod'
+    const pq = r.datos.parroquia ?? 'Sin parroquia'
+    const cc = r.datos.cod_cv    ?? 'sin-cod'
     votosMap[pq]       ??= {}
     votosMap[pq][cc]   ??= { total: 0, si: 0, no: 0, nose: 0 }
     votosMap[pq][cc].total++
@@ -52,17 +52,19 @@ export async function generarResumenTotalizado() {
     if (['si','no','nose'].includes(resp)) votosMap[pq][cc][resp]++
   }
 
-  // ── 3️⃣ Construir filas: por centro y luego subtotal parroquia
+  // ── 4️⃣ Generar filas por centro y subtotales de parroquia
   const filas = []
+  let generalElect = 0, generalEncu = 0, generalSi = 0, generalNo = 0, generalNose = 0
+
   for (const pq of Object.keys(electoresMap)) {
-    let subElect = 0, subTotal = 0, subSi = 0, subNo = 0, subNose = 0
+    let subElect = 0, subEncu = 0, subSi = 0, subNo = 0, subNose = 0
 
     for (const cc of Object.keys(electoresMap[pq])) {
       const { nombre_centro, electores } = electoresMap[pq][cc]
       const stats = votosMap[pq]?.[cc] ?? { total:0, si:0, no:0, nose:0 }
       const { total, si, no, nose } = stats
 
-      // Empujar registro de centro
+      // Registro por centro
       filas.push({
         parroquia: pq,
         codigo_centro: cc,
@@ -72,58 +74,95 @@ export async function generarResumenTotalizado() {
         si,
         nose,
         no,
-        porcentaje_participacion:
-          electores
-            ? ((total / electores)*100).toFixed(2)
-            : '0.00',
-        porcentaje_si:
-          total ? ((si / total)*100).toFixed(2) : '0.00',
-        porcentaje_nose:
-          total ? ((nose / total)*100).toFixed(2) : '0.00',
-        porcentaje_no:
-          total ? ((no / total)*100).toFixed(2) : '0.00',
+        porcentaje_participacion: electores
+          ? ((total / electores) * 100).toFixed(2)
+          : '0.00',
+        porcentaje_si: total
+          ? ((si / total) * 100).toFixed(2)
+          : '0.00',
+        porcentaje_nose: total
+          ? ((nose / total) * 100).toFixed(2)
+          : '0.00',
+        porcentaje_no: total
+          ? ((no / total) * 100).toFixed(2)
+          : '0.00',
         es_subtotal: false
       })
 
-      subElect += electores
-      subTotal += total
-      subSi    += si
-      subNo    += no
-      subNose  += nose
+      // Acumular subtotales y totales generales
+      subElect  += electores
+      subEncu   += total
+      subSi     += si
+      subNo     += no
+      subNose   += nose
+
+      generalElect += electores
+      generalEncu  += total
+      generalSi    += si
+      generalNo    += no
+      generalNose  += nose
     }
 
-    // Empujar subtotal parroquia
+    // Subtotal por parroquia
     filas.push({
       parroquia: pq,
       codigo_centro: '',
       nombre_centro: `TOTAL ${pq}`,
       electores: subElect,
-      encuestados: subTotal,
+      encuestados: subEncu,
       si: subSi,
       nose: subNose,
       no: subNo,
-      porcentaje_participacion:
-        subElect
-          ? ((subTotal / subElect)*100).toFixed(2)
-          : '0.00',
-      porcentaje_si:
-        subTotal ? ((subSi / subTotal)*100).toFixed(2) : '0.00',
-      porcentaje_nose:
-        subTotal ? ((subNose / subTotal)*100).toFixed(2) : '0.00',
-      porcentaje_no:
-        subTotal ? ((subNo / subTotal)*100).toFixed(2) : '0.00',
+      porcentaje_participacion: subElect
+        ? ((subEncu / subElect) * 100).toFixed(2)
+        : '0.00',
+      porcentaje_si: subEncu
+        ? ((subSi / subEncu) * 100).toFixed(2)
+        : '0.00',
+      porcentaje_nose: subEncu
+        ? ((subNose / subEncu) * 100).toFixed(2)
+        : '0.00',
+      porcentaje_no: subEncu
+        ? ((subNo / subEncu) * 100).toFixed(2)
+        : '0.00',
       es_subtotal: true
     })
   }
 
-  // ── 4️⃣ Insertar en Supabase
+  // ── 5️⃣ Subtotal general de electores y votos
+  filas.push({
+    parroquia: '',
+    codigo_centro: '',
+    nombre_centro: 'TOTAL GENERAL',
+    electores: generalElect,
+    encuestados: generalEncu,
+    si: generalSi,
+    nose: generalNose,
+    no: generalNo,
+    porcentaje_participacion: generalElect
+      ? ((generalEncu / generalElect) * 100).toFixed(2)
+      : '0.00',
+    porcentaje_si: generalEncu
+      ? ((generalSi / generalEncu) * 100).toFixed(2)
+      : '0.00',
+    porcentaje_nose: generalEncu
+      ? ((generalNose / generalEncu) * 100).toFixed(2)
+      : '0.00',
+    porcentaje_no: generalEncu
+      ? ((generalNo / generalEncu) * 100).toFixed(2)
+      : '0.00',
+    es_subtotal: true
+  })
+
+  // ── 6️⃣ Insertar todas las filas
   console.log(`🧾 Filas a insertar: ${filas.length}`)
   const { error: errInsert } = await supabase
     .from('resumen_totalizado')
     .insert(filas)
+
   if (errInsert) {
     console.error('❌ Error insertando resumen:', errInsert.message)
   } else {
-    console.log(`✅ Insertadas ${filas.length} filas con electores y participación`)
+    console.log(`✅ Insertadas ${filas.length} filas (centros, subtotales y total general)`)
   }
 }
