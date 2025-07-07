@@ -1,5 +1,5 @@
 // generarResumenTotalizado.js
-import { supabase } from './supabase.js';
+import supabase from './supabase.js';     // ✅ importa el default correctamente
 
 export async function actualizarResumenFijo() {
   console.log('🔄 Actualizando 16 filas en resumen_totalizado');
