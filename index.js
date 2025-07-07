@@ -30,9 +30,7 @@ import {
 } from './reporte.js';
 
 // 📄 Resumen PDF visual con porcentajes
-import {
-  generarResumenTotalizado
-} from './resumen.js';
+import { resumen } from './resumen.js';
 
 const app = express();
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.BOT_TOKEN}`;
