@@ -16,24 +16,50 @@ export async function generarResumenTotalizado() {
     return;
   }
 
-  // 2️⃣ Por cada centro: contar electores y votos
+  // 2️⃣ Leer todas las respuestas con cédula y respuesta
+  const { data: votosRaw, error: errV } = await supabase
+    .from('participacion_bot')
+    .select('cedula, respuesta');
+
+  if (errV) {
+    console.error('❌ Error leyendo votos:', errV.message);
+    return;
+  }
+
+  // 3️⃣ Buscar código_centro de cada cédula (mapeo previo)
+  const cedulasUnicas = [...new Set(votosRaw.map(v => v.cedula))];
+  const { data: cedulaCentroMap } = await supabase
+    .from('datos')
+    .select('cedula, codigo_centro');
+
+  const centroPorCedula = {};
+  cedulaCentroMap?.forEach(({ cedula, codigo_centro }) => {
+    centroPorCedula[cedula] = codigo_centro;
+  });
+
+  // 4️⃣ Agrupar votos por código_centro
+  const votosPorCentro = {};
+  votosRaw.forEach(({ cedula, respuesta }) => {
+    const centro = centroPorCedula[cedula];
+    if (!centro) return;
+    votosPorCentro[centro] ??= { total: 0, si: 0, no: 0, nose: 0 };
+    votosPorCentro[centro].total++;
+    const r = respuesta?.toLowerCase();
+    if (['si', 'no', 'nose'].includes(r)) votosPorCentro[centro][r]++;
+  });
+
+  // 5️⃣ Por cada centro: contar electores y aplicar votos
   for (const { id, codigo_centro } of centros) {
-    // ✋ Electores en "datos"
     const { count: electCount } = await supabase
       .from('datos')
       .select('cedula', { head: true, count: 'exact' })
       .eq('codigo_centro', codigo_centro);
 
-    // 🗳 Votos desde "participacion_bot"
-    const { data: votos } = await supabase
-      .from('participacion_bot')
-      .select('respuesta, datos(codigo_centro)')
-      .eq('datos.codigo_centro', codigo_centro);
-
-    const total = votos?.length || 0;
-    const si    = votos?.filter(v => v.respuesta === 'si').length || 0;
-    const no    = votos?.filter(v => v.respuesta === 'no').length || 0;
-    const nose  = votos?.filter(v => v.respuesta === 'nose').length || 0;
+    const votos = votosPorCentro[codigo_centro] || {};
+    const total = votos.total || 0;
+    const si    = votos.si || 0;
+    const no    = votos.no || 0;
+    const nose  = votos.nose || 0;
 
     const pPart = electCount ? +((total / electCount) * 100).toFixed(2) : 0;
     const pSi   = total ? +((si / total) * 100).toFixed(2) : 0;
@@ -56,7 +82,7 @@ export async function generarResumenTotalizado() {
       .eq('id', id);
   }
 
-  // 3️⃣ Recalcular subtotales por parroquia
+  // 6️⃣ Subtotales por parroquia
   const { data: actualizados } = await supabase
     .from('resumen_totalizado')
     .select('*')
@@ -90,7 +116,7 @@ export async function generarResumenTotalizado() {
       .match({ parroquia: pq, codigo_centro: '0' });
   }
 
-  // 4️⃣ Total general
+  // 7️⃣ Total general
   const tot = Object.values(agrupado).reduce(
     (acc, v) => ({
       elect: acc.elect + v.elect,
