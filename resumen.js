@@ -1,3 +1,5 @@
+// resumen.js
+
 import { generarResumenTotalizado } from './generarResumenTotalizado.js';
 import { enviarMensaje } from './utils.js';
 

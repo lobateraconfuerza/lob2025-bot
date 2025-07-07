@@ -31,10 +31,11 @@ import {
 } from './reporte.js';
 
 // 📄 Resumen totalizado
-import { resumen } from './resumen.js';
+import {
+  resumen
+} from './resumen.js';
 
 const app = express();
-const TELEGRAM_API = `https://api.telegram.org/bot${process.env.BOT_TOKEN}`;
 
 // 🛑 Evita error favicon en Render
 app.use('/favicon.ico', express.static('favicon.ico'));
@@ -47,10 +48,10 @@ app.get('/', (req, res) => {
 
 // 🤖 Webhook de Telegram
 app.post('/', async (req, res) => {
-  const body = req.body;
-
-  // siempre responde primero
+  // responde primero para evitar timeouts
   res.sendStatus(200);
+
+  const body = req.body;
 
   // 📝 Mensajes de texto
   if (body.message || body.edited_message) {
