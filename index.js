@@ -31,7 +31,7 @@ import {
 
 // 📄 Resumen PDF visual con porcentajes
 import {
-  generarResumenPDF
+  generarResumenTotalizado
 } from './resumen.js';
 
 const app = express();
