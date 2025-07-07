@@ -89,12 +89,13 @@ app.post('/', async (req, res) => {
     }
 
     // 📄 Comando /resumen
+
+    // 📄 Comando /resumen
     if (text.toLowerCase() === '/resumen') {
-      console.log('📬 Generando PDF para chatId:', chatId);
-      await generarResumenPDF(chatId);
+      console.log('📬 Ejecutando resumen general (totalización) para chatId:', chatId);
+      await resumen(chatId); // ✔️ esta es tu función actual
       return res.sendStatus(200);
     }
-  }
 
   // 🔘 Respuestas con botones
   if (body.callback_query) {

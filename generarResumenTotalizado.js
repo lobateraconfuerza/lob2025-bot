@@ -4,7 +4,9 @@ import { obtenerDatosCrudos } from './utils.js';
 import supabase from './supabase.js'; // Ajusta este import si usas otro cliente
 
 export async function generarResumenTotalizado() {
-  console.log('🔁 Generando totalización...');
+
+  console.log('🧠 Entrando a generarResumenTotalizado')
+  
 
   // Limpiar la tabla
   const borrar = await supabase.from('resumen_totalizado').delete().neq('id', 0);
@@ -15,6 +17,7 @@ export async function generarResumenTotalizado() {
 
   // Obtener datos crudos
   const registros = await obtenerDatosCrudos();
+  console.log(`📦 Registros crudos obtenidos: ${registros.length}`);
   if (!registros.length) {
     console.warn('⚠️ No hay registros para totalizar');
     return;
@@ -100,6 +103,9 @@ export async function generarResumenTotalizado() {
   }
 
   // Insertar filas en Supabase
+  
+  console.log(`🧾 Filas preparadas para insertar: ${filas.length}`);
+
   const insertar = await supabase.from('resumen_totalizado').insert(filas);
   if (insertar.error) {
     console.error('❌ Error al insertar totales:', insertar.error.message);
