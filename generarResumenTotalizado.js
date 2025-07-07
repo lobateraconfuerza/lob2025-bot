@@ -6,7 +6,7 @@ import supabase from './supabase.js';
 export async function generarResumenTotalizado() {
   console.log('🧠 Iniciando actualización de resumen_totalizado');
 
-  // 1️⃣ Leer tabla datos: conteo real de electores por parroquia y centro
+  // 1️⃣ Leer datos de electores
   const { data: datos, error: errDatos } = await supabase
     .from('datos')
     .select('parroquia, codigo_centro, nombre_centro');
@@ -43,11 +43,10 @@ export async function generarResumenTotalizado() {
     }
   }
 
-  // 3️⃣ Generar array de filas con totales por centro, subtotales y total general
+  // 3️⃣ Construir filas
   const filas = [];
   let genElect = 0, genEnc = 0, genSi = 0, genNo = 0, genNoSe = 0;
 
-  // Unir parroquias presentes en datos y votos
   const parroquias = new Set([
     ...Object.keys(electoresMap),
     ...Object.keys(votosMap)
@@ -55,21 +54,18 @@ export async function generarResumenTotalizado() {
 
   for (const pq of parroquias) {
     let subElect = 0, subEnc = 0, subSi = 0, subNo = 0, subNoSe = 0;
-
-    // Unir centros en esta parroquia
     const centros = new Set([
       ...Object.keys(electoresMap[pq] ?? {}),
       ...Object.keys(votosMap[pq] ?? {})
     ]);
 
     for (const cc of centros) {
-      const nombre   = electoresMap[pq]?.[cc]?.nombre_centro
-                    ?? votosMap[pq]?.[cc] && 'Centro sin nombre';
+      const nombre   =
+        electoresMap[pq]?.[cc]?.nombre_centro || 'Centro sin nombre';
       const electores= electoresMap[pq]?.[cc]?.electores || 0;
       const stats    = votosMap[pq]?.[cc] || { total:0, si:0, no:0, nose:0 };
       const { total, si, no, nose } = stats;
 
-      // fila por centro
       filas.push({
         parroquia: pq,
         codigo_centro: cc,
@@ -79,18 +75,14 @@ export async function generarResumenTotalizado() {
         si,
         nose,
         no,
-        porcentaje_participacion: electores
-          ? Number(((total / electores) * 100).toFixed(2))
-          : 0.0,
-        porcentaje_si: total
-          ? Number(((si / total) * 100).toFixed(2))
-          : 0.0,
-        porcentaje_nose: total
-          ? Number(((nose / total) * 100).toFixed(2))
-          : 0.0,
-        porcentaje_no: total
-          ? Number(((no / total) * 100).toFixed(2))
-          : 0.0,
+        porcentaje_participacion:
+          electores ? Number(((total / electores) * 100).toFixed(2)) : 0.0,
+        porcentaje_si:
+          total ? Number(((si / total) * 100).toFixed(2)) : 0.0,
+        porcentaje_nose:
+          total ? Number(((nose / total) * 100).toFixed(2)) : 0.0,
+        porcentaje_no:
+          total ? Number(((no / total) * 100).toFixed(2)) : 0.0,
         es_subtotal: false,
         actualizado_en: new Date().toISOString()
       });
@@ -100,7 +92,6 @@ export async function generarResumenTotalizado() {
       subSi    += si;
       subNo    += no;
       subNoSe  += nose;
-
       genElect += electores;
       genEnc   += total;
       genSi    += si;
@@ -108,7 +99,7 @@ export async function generarResumenTotalizado() {
       genNoSe  += nose;
     }
 
-    // fila subtotal parroquia
+    // Subtotal de parroquia
     filas.push({
       parroquia: pq,
       codigo_centro: '',
@@ -118,24 +109,20 @@ export async function generarResumenTotalizado() {
       si: subSi,
       nose: subNoSe,
       no: subNo,
-      porcentaje_participacion: subElect
-        ? Number(((subEnc / subElect) * 100).toFixed(2))
-        : 0.0,
-      porcentaje_si: subEnc
-        ? Number(((subSi / subEnc) * 100).toFixed(2))
-        : 0.0,
-      porcentaje_nose: subEnc
-        ? Number(((subNoSe / subEnc) * 100).toFixed(2))
-        : 0.0,
-      porcentaje_no: subEnc
-        ? Number(((subNo / subEnc) * 100).toFixed(2))
-        : 0.0,
+      porcentaje_participacion:
+        subElect ? Number(((subEnc / subElect) * 100).toFixed(2)) : 0.0,
+      porcentaje_si:
+        subEnc ? Number(((subSi / subEnc) * 100).toFixed(2)) : 0.0,
+      porcentaje_nose:
+        subEnc ? Number(((subNoSe / subEnc) * 100).toFixed(2)) : 0.0,
+      porcentaje_no:
+        subEnc ? Number(((subNo / subEnc) * 100).toFixed(2)) : 0.0,
       es_subtotal: true,
       actualizado_en: new Date().toISOString()
     });
   }
 
-  // fila total general
+  // Total general
   filas.push({
     parroquia: '',
     codigo_centro: '',
@@ -145,25 +132,21 @@ export async function generarResumenTotalizado() {
     si: genSi,
     nose: genNoSe,
     no: genNo,
-    porcentaje_participacion: genElect
-      ? Number(((genEnc / genElect) * 100).toFixed(2))
-      : 0.0,
-    porcentaje_si: genEnc
-      ? Number(((genSi / genEnc) * 100).toFixed(2))
-      : 0.0,
-    porcentaje_nose: genEnc
-      ? Number(((genNoSe / genEnc) * 100).toFixed(2))
-      : 0.0,
-    porcentaje_no: genEnc
-      ? Number(((genNo / genEnc) * 100).toFixed(2))
-      : 0.0,
+    porcentaje_participacion:
+      genElect ? Number(((genEnc / genElect) * 100).toFixed(2)) : 0.0,
+    porcentaje_si:
+      genEnc ? Number(((genSi / genEnc) * 100).toFixed(2)) : 0.0,
+    porcentaje_nose:
+      genEnc ? Number(((genNoSe / genEnc) * 100).toFixed(2)) : 0.0,
+    porcentaje_no:
+      genEnc ? Number(((genNo / genEnc) * 100).toFixed(2)) : 0.0,
     es_subtotal: true,
     actualizado_en: new Date().toISOString()
   });
 
   console.log(`🔢 Total de filas a upsert: ${filas.length}`);
 
-  // 4️⃣ Upsert: insertar o actualizar cada fila
+  // 4️⃣ Upsert en Supabase
   const { error: errUpsert } = await supabase
     .from('resumen_totalizado')
     .upsert(filas, {
