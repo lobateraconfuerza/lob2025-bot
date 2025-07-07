@@ -29,7 +29,7 @@ export async function generarResumenTotalizado() {
   for (const r of registros) {
     const d = r.datos ?? {};
     const parroquia = d.parroquia ?? 'Sin parroquia';
-    const codCV = d.cod_cv ?? 'sin-cod';
+    const codCV = d.codigo_centro ?? 'sin-cod';
     const centro = d.nombre_centro ?? 'Centro sin nombre';
     const electores = Number(d.electores) || 0;
 
@@ -61,7 +61,7 @@ export async function generarResumenTotalizado() {
 
       const fila = {
         parroquia,
-        cod_cv: codCV,
+        codigo_centro: codCV,
         nombre_centro: nombre,
         electores,
         encuestados: total,
@@ -87,7 +87,7 @@ export async function generarResumenTotalizado() {
     // Agregar subtotal de parroquia
     filas.push({
       parroquia,
-      cod_cv: '',
+      codigo_centro: '',
       nombre_centro: 'TOTAL PARROQUIA',
       electores: subtotalElectores,
       encuestados: subtotalEncuestados,

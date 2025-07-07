@@ -1,4 +1,5 @@
 import { generarResumenTotalizado } from './generarResumenTotalizado.js';
+import { enviarMensaje } from './utils.js';
 
 export async function resumen(chatId) {
   try {
