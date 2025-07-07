@@ -4,158 +4,110 @@ import { obtenerDatosCrudos } from './utils.js';
 import supabase from './supabase.js';
 
 export async function generarResumenTotalizado() {
-  console.log('🧠 Iniciando actualización de resumen_totalizado');
+  console.log('🧠 Actualizando resumen_totalizado sin upsert');
 
-  // 1️⃣ Leer datos de electores
+  // 1️⃣ Contar electores y votos (igual que antes)…
   const { data: datos, error: errDatos } = await supabase
-    .from('datos')
-    .select('parroquia, codigo_centro, nombre_centro');
-  if (errDatos) {
-    console.error('❌ Error leyendo "datos":', errDatos.message);
-    return;
-  }
+    .from('datos').select('parroquia, codigo_centro, nombre_centro');
+  if (errDatos) return console.error(errDatos);
 
-  // electoresMap[pq][cc] = { nombre_centro, electores }
   const electoresMap = {};
   for (const { parroquia, codigo_centro, nombre_centro } of datos) {
-    const pq = parroquia      ?? 'Sin parroquia';
-    const cc = codigo_centro  ?? 'sin-cod';
+    const pq = parroquia      || '';
+    const cc = codigo_centro  || '';
     electoresMap[pq]         ??= {};
     electoresMap[pq][cc]     ??= { nombre_centro, electores: 0 };
     electoresMap[pq][cc].electores++;
   }
 
-  // 2️⃣ Leer respuestas de encuesta
   const respuestas = await obtenerDatosCrudos();
-  console.log(`📦 Procesando ${respuestas.length} respuestas de encuesta`);
-
-  // votosMap[pq][cc] = { total, si, no, nose }
   const votosMap = {};
   for (const r of respuestas) {
-    const pq = r.datos.parroquia ?? 'Sin parroquia';
-    const cc = r.datos.cod_cv      ?? 'sin-cod';
-    votosMap[pq]           ??= {};
-    votosMap[pq][cc]       ??= { total: 0, si: 0, no: 0, nose: 0 };
+    const pq = r.datos.parroquia || '';
+    const cc = r.datos.cod_cv    || '';
+    votosMap[pq]       ??= {};
+    votosMap[pq][cc]   ??= { total: 0, si: 0, no: 0, nose: 0 };
     votosMap[pq][cc].total++;
-    const resp = (r.respuesta || '').toLowerCase();
-    if (['si', 'no', 'nose'].includes(resp)) {
-      votosMap[pq][cc][resp]++;
-    }
+    const resp = (r.respuesta||'').toLowerCase();
+    if (['si','no','nose'].includes(resp)) votosMap[pq][cc][resp]++;
   }
 
-  // 3️⃣ Construir filas
+  // 2️⃣ Armar filas
   const filas = [];
-  let genElect = 0, genEnc = 0, genSi = 0, genNo = 0, genNoSe = 0;
+  let genE=0, genV=0, genSi=0, genNo=0, genNs=0;
+  for (const pq of new Set([...Object.keys(electoresMap), ...Object.keys(votosMap)])) {
+    let subE=0, subV=0, subSi=0, subNo=0, subNs=0;
 
-  const parroquias = new Set([
-    ...Object.keys(electoresMap),
-    ...Object.keys(votosMap)
-  ]);
+    for (const cc of new Set([
+      ...Object.keys(electoresMap[pq]||{}),
+      ...Object.keys(votosMap[pq]||{})
+    ])) {
+      const nombre   = electoresMap[pq]?.[cc]?.nombre_centro || '';
+      const elect    = electoresMap[pq]?.[cc]?.electores       || 0;
+      const vs       = votosMap[pq]?.[cc]                      || {total:0,si:0,no:0,nose:0};
+      const { total, si, no, nose } = vs;
 
-  for (const pq of parroquias) {
-    let subElect = 0, subEnc = 0, subSi = 0, subNo = 0, subNoSe = 0;
-    const centros = new Set([
-      ...Object.keys(electoresMap[pq] ?? {}),
-      ...Object.keys(votosMap[pq] ?? {})
-    ]);
-
-    for (const cc of centros) {
-      const nombre   =
-        electoresMap[pq]?.[cc]?.nombre_centro || 'Centro sin nombre';
-      const electores= electoresMap[pq]?.[cc]?.electores || 0;
-      const stats    = votosMap[pq]?.[cc] || { total:0, si:0, no:0, nose:0 };
-      const { total, si, no, nose } = stats;
-
-      filas.push({
-        parroquia: pq,
-        codigo_centro: cc,
-        nombre_centro: nombre,
-        electores,
-        encuestados: total,
-        si,
-        nose,
-        no,
-        porcentaje_participacion:
-          electores ? Number(((total / electores) * 100).toFixed(2)) : 0.0,
-        porcentaje_si:
-          total ? Number(((si / total) * 100).toFixed(2)) : 0.0,
-        porcentaje_nose:
-          total ? Number(((nose / total) * 100).toFixed(2)) : 0.0,
-        porcentaje_no:
-          total ? Number(((no / total) * 100).toFixed(2)) : 0.0,
-        es_subtotal: false,
-        actualizado_en: new Date().toISOString()
+      filas.push({ parroquia: pq, codigo_centro: cc, nombre_centro: nombre,
+        electores: elect, encuestados: total, si, nose, no,
+        porcentaje_participacion: elect ? +(total/elect*100).toFixed(2) : 0,
+        porcentaje_si: total ? +(si/total*100).toFixed(2) : 0,
+        porcentaje_nose: total ? +(nose/total*100).toFixed(2) : 0,
+        porcentaje_no: total ? +(no/total*100).toFixed(2) : 0,
+        es_subtotal: false, actualizado_en: new Date().toISOString()
       });
 
-      subElect += electores;
-      subEnc   += total;
-      subSi    += si;
-      subNo    += no;
-      subNoSe  += nose;
-      genElect += electores;
-      genEnc   += total;
-      genSi    += si;
-      genNo    += no;
-      genNoSe  += nose;
+      subE += elect; subV += total;
+      subSi += si;    subNo += no;   subNs += nose;
+      genE += elect;  genV += total;
+      genSi += si;    genNo += no;   genNs += nose;
     }
 
-    // Subtotal de parroquia
-    filas.push({
-      parroquia: pq,
-      codigo_centro: '',
-      nombre_centro: `TOTAL ${pq}`,
-      electores: subElect,
-      encuestados: subEnc,
-      si: subSi,
-      nose: subNoSe,
-      no: subNo,
-      porcentaje_participacion:
-        subElect ? Number(((subEnc / subElect) * 100).toFixed(2)) : 0.0,
-      porcentaje_si:
-        subEnc ? Number(((subSi / subEnc) * 100).toFixed(2)) : 0.0,
-      porcentaje_nose:
-        subEnc ? Number(((subNoSe / subEnc) * 100).toFixed(2)) : 0.0,
-      porcentaje_no:
-        subEnc ? Number(((subNo / subEnc) * 100).toFixed(2)) : 0.0,
-      es_subtotal: true,
-      actualizado_en: new Date().toISOString()
+    // subtotal parroquia
+    filas.push({ parroquia: pq, codigo_centro: '', nombre_centro:`TOTAL ${pq}`,
+      electores: subE, encuestados: subV, si: subSi, nose: subNs, no: subNo,
+      porcentaje_participacion: subE ? +(subV/subE*100).toFixed(2) : 0,
+      porcentaje_si: subV ? +(subSi/subV*100).toFixed(2) : 0,
+      porcentaje_nose: subV ? +(subNs/subV*100).toFixed(2) : 0,
+      porcentaje_no: subV ? +(subNo/subV*100).toFixed(2) : 0,
+      es_subtotal: true, actualizado_en: new Date().toISOString()
     });
   }
 
-  // Total general
-  filas.push({
-    parroquia: '',
-    codigo_centro: '',
-    nombre_centro: 'TOTAL GENERAL',
-    electores: genElect,
-    encuestados: genEnc,
-    si: genSi,
-    nose: genNoSe,
-    no: genNo,
-    porcentaje_participacion:
-      genElect ? Number(((genEnc / genElect) * 100).toFixed(2)) : 0.0,
-    porcentaje_si:
-      genEnc ? Number(((genSi / genEnc) * 100).toFixed(2)) : 0.0,
-    porcentaje_nose:
-      genEnc ? Number(((genNoSe / genEnc) * 100).toFixed(2)) : 0.0,
-    porcentaje_no:
-      genEnc ? Number(((genNo / genEnc) * 100).toFixed(2)) : 0.0,
-    es_subtotal: true,
-    actualizado_en: new Date().toISOString()
+  // total general
+  filas.push({ parroquia:'', codigo_centro:'', nombre_centro:'TOTAL GENERAL',
+    electores: genE, encuestados: genV, si: genSi, nose: genNs, no: genNo,
+    porcentaje_participacion: genE ? +(genV/genE*100).toFixed(2) : 0,
+    porcentaje_si: genV ? +(genSi/genV*100).toFixed(2) : 0,
+    porcentaje_nose: genV ? +(genNs/genV*100).toFixed(2) : 0,
+    porcentaje_no: genV ? +(genNo/genV*100).toFixed(2) : 0,
+    es_subtotal: true, actualizado_en: new Date().toISOString()
   });
 
-  console.log(`🔢 Total de filas a upsert: ${filas.length}`);
+  console.log(`🔢 Procesando ${filas.length} filas de resumen`);
 
-  // 4️⃣ Upsert en Supabase
-  const { error: errUpsert } = await supabase
-    .from('resumen_totalizado')
-    .upsert(filas, {
-      onConflict: ['parroquia', 'codigo_centro']
-    });
+  // 3️⃣ Insert or update fila a fila
+  for (const row of filas) {
+    const { data: existing } = await supabase
+      .from('resumen_totalizado')
+      .select('id')
+      .match({
+        parroquia: row.parroquia,
+        codigo_centro: row.codigo_centro
+      });
 
-  if (errUpsert) {
-    console.error('❌ Error al upsert en resumen_totalizado:', errUpsert.message);
-  } else {
-    console.log(`✅ Resumen actualizado: ${filas.length} filas procesadas`);
+    if (existing?.length) {
+      // ya existe → UPDATE
+      await supabase
+        .from('resumen_totalizado')
+        .update(row)
+        .match({ id: existing[0].id });
+    } else {
+      // no existe → INSERT
+      await supabase
+        .from('resumen_totalizado')
+        .insert(row);
+    }
   }
+
+  console.log('✅ Resumen totalizado actualizado correctamente');
 }
