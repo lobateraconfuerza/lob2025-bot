@@ -1,4 +1,5 @@
 // index.js – Bot Lobatera + Fuerte completo
+
 import express from 'express';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
@@ -29,7 +30,7 @@ import {
   generarReporteGeneral
 } from './reporte.js';
 
-// 📄 Resumen PDF visual con porcentajes
+// 📄 Resumen totalizado
 import { resumen } from './resumen.js';
 
 const app = express();
@@ -48,6 +49,9 @@ app.get('/', (req, res) => {
 app.post('/', async (req, res) => {
   const body = req.body;
 
+  // siempre responde primero
+  res.sendStatus(200);
+
   // 📝 Mensajes de texto
   if (body.message || body.edited_message) {
     const message = body.message || body.edited_message;
@@ -56,7 +60,7 @@ app.post('/', async (req, res) => {
 
     if (!chatId || !text) {
       console.error('🚫 chatId o texto no disponible');
-      return res.sendStatus(200);
+      return;
     }
 
     // 👉 /start con cédula
@@ -64,13 +68,15 @@ app.post('/', async (req, res) => {
       const partes = text.split(' ');
       const cedula = partes[1];
       if (!cedula || !/^\d+$/.test(cedula)) {
-        await enviarMensaje(chatId,
+        await enviarMensaje(
+          chatId,
           `👋 Bienvenido al *Bot Lobatera + Fuerte*\n\nPara comenzar, escribe tu cédula después del comando:\n\nEjemplo: \`/start 12345678\`\n\nEstamos construyendo comunidad con tecnología y convicción 🇻🇪`,
-          'Markdown');
-        return res.sendStatus(200);
+          'Markdown'
+        );
+        return;
       }
       await procesarCedula(chatId, 'V', cedula);
-      return res.sendStatus(200);
+      return;
     }
 
     // 👉 Entrada directa: V12345678 o E12345678
@@ -78,24 +84,25 @@ app.post('/', async (req, res) => {
       const tipo = text.charAt(0).toUpperCase();
       const cedula = text.slice(1);
       await procesarCedula(chatId, tipo, cedula);
-      return res.sendStatus(200);
+      return;
     }
 
     // 📊 Comando /reporte
     if (text.toLowerCase() === '/reporte') {
       console.log('📬 Generando Excel para chatId:', chatId);
       await generarReporteGeneral(chatId);
-      return res.sendStatus(200);
+      return;
     }
-
-    // 📄 Comando /resumen
 
     // 📄 Comando /resumen
     if (text.toLowerCase() === '/resumen') {
       console.log('📬 Ejecutando resumen general (totalización) para chatId:', chatId);
-      await resumen(chatId); // ✔️ esta es tu función actual
-      return res.sendStatus(200);
+      await resumen(chatId);
+      return;
     }
+
+    return;
+  }
 
   // 🔘 Respuestas con botones
   if (body.callback_query) {
@@ -106,11 +113,11 @@ app.post('/', async (req, res) => {
 
     if (!chatId || !messageId || !respuesta) {
       console.error('🚫 Datos incompletos en callback');
-      return res.sendStatus(200);
+      return;
     }
 
     const [opcion, cedula] = respuesta.split(':');
-    const tipo = 'V'; // Puedes adaptarlo si capturas el tipo en el frontend
+    const tipo = 'V';
 
     const estado = await registrarDecision(cedula, opcion, chatId);
     await eliminarBotones(chatId, messageId);
@@ -123,10 +130,11 @@ app.post('/', async (req, res) => {
       await enviarMensaje(chatId, `💥 Hubo un error registrando tu respuesta. Intenta de nuevo más tarde.`);
     }
 
-    return res.sendStatus(200);
+    return;
   }
 
-  res.sendStatus(200);
+  // cualquier otro caso
+  return;
 });
 
 // 🚀 Activación del bot
