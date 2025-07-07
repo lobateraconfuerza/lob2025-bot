@@ -5,22 +5,22 @@ import supabase from './supabase.js';
 export async function generarResumenTotalizado() {
   console.log('🧠 Entrando a generarResumenTotalizado');
 
-  // 1️⃣ Contar electores reales por centro desde tabla "datos"
-  const { data: electoresPorCentro, error: errEC } = await supabase
+  // 1️⃣ Traer todos los electores para conteo manual por centro
+  const { data: allElectores, error: errEC } = await supabase
     .from('datos')
-    .select('codigo_centro, count(cedula) as electores', { count: 'exact' })
-    .group('codigo_centro');
+    .select('codigo_centro');
 
   if (errEC) {
-    console.error('❌ Error contando electores por centro:', errEC.message);
+    console.error('❌ Error obteniendo electores:', errEC.message);
     return;
   }
 
-  // Armar mapa: { [codigo_centro]: electores }
+  // Armar mapa: { [codigo_centro]: totalElectores }
   const mapaElectores = {};
-  electoresPorCentro.forEach(row => {
-    mapaElectores[row.codigo_centro] = Number(row.electores) || 0;
-  });
+  for (const row of allElectores) {
+    const key = row.codigo_centro ?? 'sin-cod';
+    mapaElectores[key] = (mapaElectores[key] || 0) + 1;
+  }
 
   // 2️⃣ Vaciar tabla resumen_totalizado
   const borrar = await supabase
@@ -32,7 +32,7 @@ export async function generarResumenTotalizado() {
     return;
   }
 
-  // 3️⃣ Traer respuestas de encuestas
+  // 3️⃣ Obtener respuestas de encuestas
   const registros = await obtenerDatosCrudos();
   console.log(`📦 Registros crudos obtenidos: ${registros.length}`);
   if (!registros.length) {
@@ -42,7 +42,7 @@ export async function generarResumenTotalizado() {
 
   // 4️⃣ Agrupar por parroquia y centro
   const agrupado = {};
-  registros.forEach(r => {
+  for (const r of registros) {
     const d = r.datos || {};
     const parroquia = d.parroquia || 'Sin parroquia';
     const codigo_centro = d.codigo_centro || 'sin-cod';
@@ -58,12 +58,16 @@ export async function generarResumenTotalizado() {
     const resp = (r.respuesta || '').toLowerCase();
     actual.total++;
     if (['si', 'nose', 'no'].includes(resp)) actual[resp]++;
-  });
+  }
 
   // 5️⃣ Preparar filas para insertar
   const filas = [];
   for (const parroquia in agrupado) {
-    let subElect = 0, subEncu = 0, subSi = 0, subNo = 0, subNose = 0;
+    let subElect = 0,
+      subEncu = 0,
+      subSi = 0,
+      subNo = 0,
+      subNose = 0;
 
     for (const clave in agrupado[parroquia]) {
       const [codigo_centro, nombre_centro] = clave.split('|');
@@ -96,12 +100,12 @@ export async function generarResumenTotalizado() {
 
       subElect += electores;
       subEncu += total;
-      subSi    += si;
-      subNo    += no;
-      subNose  += nose;
+      subSi += si;
+      subNo += no;
+      subNose += nose;
     }
 
-    // Fila subtotal de parroquia
+    // subtotal parroquia
     filas.push({
       parroquia,
       codigo_centro: '',
