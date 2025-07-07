@@ -4,110 +4,173 @@ import { obtenerDatosCrudos } from './utils.js';
 import supabase from './supabase.js';
 
 export async function generarResumenTotalizado() {
-  console.log('🧠 Actualizando resumen_totalizado sin upsert');
+  console.log('🧠 Iniciando totalización completa (delete + insert)');
 
-  // 1️⃣ Contar electores y votos (igual que antes)…
-  const { data: datos, error: errDatos } = await supabase
-    .from('datos').select('parroquia, codigo_centro, nombre_centro');
-  if (errDatos) return console.error(errDatos);
+  // ── 0️⃣ Borrar todas las filas antiguas
+  const { error: errDel } = await supabase
+    .from('resumen_totalizado')
+    .delete()
+    .neq('id', 0);         // borra todas excepto id=0, si lo tienes reservado
+  if (errDel) {
+    console.error('❌ No pude limpiar la tabla:', errDel.message);
+    return;
+  }
 
+  // ── 1️⃣ Cálculo de electores reales por parroquia y centro
+  const { data: todosElectores, error: errE } = await supabase
+    .from('datos')
+    .select('parroquia, codigo_centro, nombre_centro');
+  if (errE) {
+    console.error('❌ Falló lectura de electores:', errE.message);
+    return;
+  }
+
+  // electoresMap[pq][cc] = { nombre_centro, electores }
   const electoresMap = {};
-  for (const { parroquia, codigo_centro, nombre_centro } of datos) {
-    const pq = parroquia      || '';
-    const cc = codigo_centro  || '';
-    electoresMap[pq]         ??= {};
-    electoresMap[pq][cc]     ??= { nombre_centro, electores: 0 };
+  for (const { parroquia, codigo_centro, nombre_centro } of todosElectores) {
+    const pq = parroquia     || 'Sin parroquia';
+    const cc = codigo_centro || 'sin-cod';
+    electoresMap[pq]       ??= {};
+    electoresMap[pq][cc]   ??= { nombre_centro, electores: 0 };
     electoresMap[pq][cc].electores++;
   }
 
-  const respuestas = await obtenerDatosCrudos();
+  // ── 2️⃣ Cálculo de respuestas por centro/parroquia
+  const votos = await obtenerDatosCrudos();
+  console.log(`📦 ${votos.length} respuestas en crudo`);
   const votosMap = {};
-  for (const r of respuestas) {
-    const pq = r.datos.parroquia || '';
-    const cc = r.datos.cod_cv    || '';
-    votosMap[pq]       ??= {};
-    votosMap[pq][cc]   ??= { total: 0, si: 0, no: 0, nose: 0 };
+  for (const r of votos) {
+    const pq = r.datos.parroquia || 'Sin parroquia';
+    const cc = r.datos.cod_cv      || 'sin-cod';
+    votosMap[pq]         ??= {};
+    votosMap[pq][cc]     ??= { total: 0, si: 0, no: 0, nose: 0 };
     votosMap[pq][cc].total++;
     const resp = (r.respuesta||'').toLowerCase();
-    if (['si','no','nose'].includes(resp)) votosMap[pq][cc][resp]++;
+    if (['si','no','nose'].includes(resp)) {
+      votosMap[pq][cc][resp]++;
+    }
   }
 
-  // 2️⃣ Armar filas
+  // ── 3️⃣ Generar array de 16 filas (centros + subtotales + total general)
   const filas = [];
-  let genE=0, genV=0, genSi=0, genNo=0, genNs=0;
-  for (const pq of new Set([...Object.keys(electoresMap), ...Object.keys(votosMap)])) {
-    let subE=0, subV=0, subSi=0, subNo=0, subNs=0;
+  let genE = 0, genV = 0, genSi = 0, genNo = 0, genNs = 0;
 
-    for (const cc of new Set([
-      ...Object.keys(electoresMap[pq]||{}),
-      ...Object.keys(votosMap[pq]||{})
-    ])) {
-      const nombre   = electoresMap[pq]?.[cc]?.nombre_centro || '';
-      const elect    = electoresMap[pq]?.[cc]?.electores       || 0;
-      const vs       = votosMap[pq]?.[cc]                      || {total:0,si:0,no:0,nose:0};
-      const { total, si, no, nose } = vs;
+  // unimos las parroquias disponibles
+  const parroquias = Object.keys(electoresMap);
 
-      filas.push({ parroquia: pq, codigo_centro: cc, nombre_centro: nombre,
-        electores: elect, encuestados: total, si, nose, no,
-        porcentaje_participacion: elect ? +(total/elect*100).toFixed(2) : 0,
-        porcentaje_si: total ? +(si/total*100).toFixed(2) : 0,
-        porcentaje_nose: total ? +(nose/total*100).toFixed(2) : 0,
-        porcentaje_no: total ? +(no/total*100).toFixed(2) : 0,
-        es_subtotal: false, actualizado_en: new Date().toISOString()
+  for (const pq of parroquias) {
+    let subE = 0, subV = 0, subSi = 0, subNo = 0, subNs = 0;
+
+    // recorremos SOLO los centros que realmente existen en electoresMap[pq]
+    const centros = Object.keys(electoresMap[pq]);
+
+    for (const cc of centros) {
+      const { nombre_centro, electores } = electoresMap[pq][cc];
+      const { total=0, si=0, no=0, nose=0 } = votosMap[pq]?.[cc] || {};
+
+      // acumuladores
+      subE  += electores;
+      subV  += total;
+      subSi += si;
+      subNo += no;
+      subNs += nose;
+      genE  += electores;
+      genV  += total;
+      genSi += si;
+      genNo += no;
+      genNs += nose;
+
+      filas.push({
+        parroquia: pq,
+        codigo_centro: cc,
+        nombre_centro,
+        electores,
+        encuestados: total,
+        si,
+        nose,
+        no,
+        porcentaje_participacion: electores
+          ? Number(((total / electores) * 100).toFixed(2))
+          : 0.0,
+        porcentaje_si: total
+          ? Number(((si / total) * 100).toFixed(2))
+          : 0.0,
+        porcentaje_nose: total
+          ? Number(((nose / total) * 100).toFixed(2))
+          : 0.0,
+        porcentaje_no: total
+          ? Number(((no / total) * 100).toFixed(2))
+          : 0.0,
+        es_subtotal: false
       });
-
-      subE += elect; subV += total;
-      subSi += si;    subNo += no;   subNs += nose;
-      genE += elect;  genV += total;
-      genSi += si;    genNo += no;   genNs += nose;
     }
 
-    // subtotal parroquia
-    filas.push({ parroquia: pq, codigo_centro: '', nombre_centro:`TOTAL ${pq}`,
-      electores: subE, encuestados: subV, si: subSi, nose: subNs, no: subNo,
-      porcentaje_participacion: subE ? +(subV/subE*100).toFixed(2) : 0,
-      porcentaje_si: subV ? +(subSi/subV*100).toFixed(2) : 0,
-      porcentaje_nose: subV ? +(subNs/subV*100).toFixed(2) : 0,
-      porcentaje_no: subV ? +(subNo/subV*100).toFixed(2) : 0,
-      es_subtotal: true, actualizado_en: new Date().toISOString()
+    // fila subtotal parroquia
+    filas.push({
+      parroquia: pq,
+      codigo_centro: '0',
+      nombre_centro: `TOTAL PARROQUIA ${pq}`,
+      electores: subE,
+      encuestados: subV,
+      si: subSi,
+      nose: subNs,
+      no: subNo,
+      porcentaje_participacion: subE
+        ? Number(((subV / subE) * 100).toFixed(2))
+        : 0.0,
+      porcentaje_si: subV
+        ? Number(((subSi / subV) * 100).toFixed(2))
+        : 0.0,
+      porcentaje_nose: subV
+        ? Number(((subNs / subV) * 100).toFixed(2))
+        : 0.0,
+      porcentaje_no: subV
+        ? Number(((subNo / subV) * 100).toFixed(2))
+        : 0.0,
+      es_subtotal: true
     });
   }
 
-  // total general
-  filas.push({ parroquia:'', codigo_centro:'', nombre_centro:'TOTAL GENERAL',
-    electores: genE, encuestados: genV, si: genSi, nose: genNs, no: genNo,
-    porcentaje_participacion: genE ? +(genV/genE*100).toFixed(2) : 0,
-    porcentaje_si: genV ? +(genSi/genV*100).toFixed(2) : 0,
-    porcentaje_nose: genV ? +(genNs/genV*100).toFixed(2) : 0,
-    porcentaje_no: genV ? +(genNo/genV*100).toFixed(2) : 0,
-    es_subtotal: true, actualizado_en: new Date().toISOString()
+  // fila TOTAL GENERAL
+  filas.push({
+    parroquia: '',
+    codigo_centro: '0',
+    nombre_centro: 'TOTAL GENERAL',
+    electores: genE,
+    encuestados: genV,
+    si: genSi,
+    nose: genNs,
+    no: genNo,
+    porcentaje_participacion: genE
+      ? Number(((genV / genE) * 100).toFixed(2))
+      : 0.0,
+    porcentaje_si: genV
+      ? Number(((genSi / genV) * 100).toFixed(2))
+      : 0.0,
+    porcentaje_nose: genV
+      ? Number(((genNs / genV) * 100).toFixed(2))
+      : 0.0,
+    porcentaje_no: genV
+      ? Number(((genNo / genV) * 100).toFixed(2))
+      : 0.0,
+    es_subtotal: true
   });
 
-  console.log(`🔢 Procesando ${filas.length} filas de resumen`);
-
-  // 3️⃣ Insert or update fila a fila
-  for (const row of filas) {
-    const { data: existing } = await supabase
-      .from('resumen_totalizado')
-      .select('id')
-      .match({
-        parroquia: row.parroquia,
-        codigo_centro: row.codigo_centro
-      });
-
-    if (existing?.length) {
-      // ya existe → UPDATE
-      await supabase
-        .from('resumen_totalizado')
-        .update(row)
-        .match({ id: existing[0].id });
-    } else {
-      // no existe → INSERT
-      await supabase
-        .from('resumen_totalizado')
-        .insert(row);
-    }
+  console.log(`🔢 Insertando ${filas.length} filas (deben ser 16)`);
+  if (filas.length !== 16) {
+    console.warn(
+      `⚠️ Se esperaban 16 filas pero se generaron ${filas.length}.`
+    );
   }
 
-  console.log('✅ Resumen totalizado actualizado correctamente');
+  // ── 4️⃣ Insertar TODO de una sola vez
+  const { error: errIns } = await supabase
+    .from('resumen_totalizado')
+    .insert(filas);
+
+  if (errIns) {
+    console.error('❌ Error insertando resumen:', errIns.message);
+  } else {
+    console.log(`✅ Resumen totalizado creado: ${filas.length} filas`);
+  }
 }
