@@ -5,7 +5,7 @@ import supabase from './supabase.js';
 export async function generarResumenTotalizado() {
   console.log('🔄 Actualizando 16 filas en resumen_totalizado');
 
-  // 1️⃣ Leer registros de centros (es_subtotal = false)
+  // 1️⃣ Leer registros de centros
   const { data: centros, error: errCentros } = await supabase
     .from('resumen_totalizado')
     .select('id, codigo_centro, parroquia')
@@ -16,7 +16,7 @@ export async function generarResumenTotalizado() {
     return;
   }
 
-  // 2️⃣ Leer todas las respuestas con cédula y respuesta
+  // 2️⃣ Leer todas las respuestas de participación
   const { data: votosRaw, error: errV } = await supabase
     .from('participacion_bot')
     .select('cedula, respuesta');
@@ -26,29 +26,40 @@ export async function generarResumenTotalizado() {
     return;
   }
 
-  // 3️⃣ Buscar código_centro de cada cédula (mapeo previo)
-  const cedulasUnicas = [...new Set(votosRaw.map(v => v.cedula))];
+  // 3️⃣ Obtener mapeo cédula → centro
   const { data: cedulaCentroMap } = await supabase
     .from('datos')
     .select('cedula, codigo_centro');
 
   const centroPorCedula = {};
   cedulaCentroMap?.forEach(({ cedula, codigo_centro }) => {
-    centroPorCedula[cedula] = codigo_centro;
+    if (cedula != null) {
+      centroPorCedula[cedula.toString()] = codigo_centro;
+    }
   });
 
-  // 4️⃣ Agrupar votos por código_centro
+  // 4️⃣ Agrupar votos por centro
   const votosPorCentro = {};
+  const cedulasNoMapeadas = [];
+
   votosRaw.forEach(({ cedula, respuesta }) => {
-    const centro = centroPorCedula[cedula];
-    if (!centro) return;
+    const centro = centroPorCedula[cedula?.toString()];
+    if (!centro) {
+      cedulasNoMapeadas.push(cedula);
+      return;
+    }
+
     votosPorCentro[centro] ??= { total: 0, si: 0, no: 0, nose: 0 };
     votosPorCentro[centro].total++;
     const r = respuesta?.toLowerCase();
     if (['si', 'no', 'nose'].includes(r)) votosPorCentro[centro][r]++;
   });
 
-  // 5️⃣ Por cada centro: contar electores y aplicar votos
+  if (cedulasNoMapeadas.length > 0) {
+    console.warn(`⚠️ Cédulas sin centro asignado:`, cedulasNoMapeadas);
+  }
+
+  // 5️⃣ Actualizar cada centro
   for (const { id, codigo_centro } of centros) {
     const { count: electCount } = await supabase
       .from('datos')
@@ -57,14 +68,14 @@ export async function generarResumenTotalizado() {
 
     const votos = votosPorCentro[codigo_centro] || {};
     const total = votos.total || 0;
-    const si    = votos.si || 0;
-    const no    = votos.no || 0;
-    const nose  = votos.nose || 0;
+    const si = votos.si || 0;
+    const no = votos.no || 0;
+    const nose = votos.nose || 0;
 
     const pPart = electCount ? +((total / electCount) * 100).toFixed(2) : 0;
-    const pSi   = total ? +((si / total) * 100).toFixed(2) : 0;
-    const pNo   = total ? +((no / total) * 100).toFixed(2) : 0;
-    const pNs   = total ? +((nose / total) * 100).toFixed(2) : 0;
+    const pSi = total ? +((si / total) * 100).toFixed(2) : 0;
+    const pNo = total ? +((no / total) * 100).toFixed(2) : 0;
+    const pNs = total ? +((nose / total) * 100).toFixed(2) : 0;
 
     await supabase
       .from('resumen_totalizado')
@@ -92,10 +103,10 @@ export async function generarResumenTotalizado() {
     const pq = fila.parroquia;
     acc[pq] ??= { elect: 0, enc: 0, si: 0, no: 0, ns: 0 };
     acc[pq].elect += fila.electores;
-    acc[pq].enc   += fila.encuestados;
-    acc[pq].si    += fila.si;
-    acc[pq].no    += fila.no;
-    acc[pq].ns    += fila.nose;
+    acc[pq].enc += fila.encuestados;
+    acc[pq].si += fila.si;
+    acc[pq].no += fila.no;
+    acc[pq].ns += fila.nose;
     return acc;
   }, {});
 
@@ -120,12 +131,12 @@ export async function generarResumenTotalizado() {
   const tot = Object.values(agrupado).reduce(
     (acc, v) => ({
       elect: acc.elect + v.elect,
-      enc:   acc.enc   + v.enc,
-      si:    acc.si    + v.si,
-      no:    acc.no    + v.no,
-      ns:    acc.ns    + v.ns
+      enc: acc.enc + v.enc,
+      si: acc.si + v.si,
+      no: acc.no + v.no,
+      ns: acc.ns + v.ns
     }),
-    { elect:0, enc:0, si:0, no:0, ns:0 }
+    { elect: 0, enc: 0, si: 0, no: 0, ns: 0 }
   );
 
   await supabase
