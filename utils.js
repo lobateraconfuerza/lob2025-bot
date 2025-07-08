@@ -102,25 +102,31 @@ export async function enviarDocumento(chatId, archivo, nombre = 'Resumen_Totaliz
   const form = new FormData();
   form.append('chat_id', chatId);
 
-  if (archivo instanceof Buffer) {
-    form.append('document', archivo, { filename: nombre });
-  } else if (typeof archivo.arrayBuffer === 'function') {
-    const arrayBuffer = await archivo.arrayBuffer();
-    console.log('✅ Documento recibido. Tamaño aproximado:', archivo?.length || 'desconocido');
-    form.append('document', Buffer.from(arrayBuffer), { filename: nombre });
-  } else {
-    console.error('🚫 Tipo de archivo no soportado para enviarDocumento');
-    return;
-  }
-
   try {
+    if (archivo instanceof Buffer) {
+      console.log('📦 Documento recibido como Buffer. Tamaño:', archivo.length);
+      form.append('document', archivo, { filename: nombre });
+    } else if (archivo && typeof archivo.arrayBuffer === 'function') {
+      const arrayBuffer = await archivo.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      console.log('📦 Documento convertido desde Blob/File. Tamaño:', buffer.length);
+      form.append('document', buffer, { filename: nombre });
+    } else {
+      console.error('🚫 Tipo de archivo no soportado para enviarDocumento. Tipo recibido:', typeof archivo);
+      return;
+    }
+
     const response = await fetch(`${TELEGRAM_API}/sendDocument`, {
       method: 'POST',
       body: form,
       headers: form.getHeaders()
     });
     const result = await response.json();
-    if (!result.ok) console.error('🚨 Telegram no envió el documento:', result.description);
+    if (!result.ok) {
+      console.error('🚨 Telegram no envió el documento:', result.description);
+    } else {
+      console.log('✅ Documento enviado correctamente a Telegram');
+    }
   } catch (error) {
     console.error('💥 Error al enviar documento:', error.message);
   }
