@@ -26,9 +26,9 @@ export async function generarResumenTotalizado() {
     return;
   }
 
-  // 3️⃣ Obtener mapeo cédula → centro
-  votosPorCentro = {};
-  cedulasNoMapeadas = [];
+  // 3️⃣ Agrupar votos por centro mediante búsqueda directa por cédula
+  let votosPorCentro = {};
+  let cedulasNoMapeadas = [];
 
   for (const { cedula, respuesta } of votosRaw) {
     const cedulaKey = cedula?.toString().padStart(8, '0');
@@ -53,33 +53,13 @@ export async function generarResumenTotalizado() {
     if (['si', 'no', 'nose'].includes(r)) votosPorCentro[centro][r]++;
   }
 
-  // 4️⃣ Agrupar votos por centro
-  const votosPorCentro = {};
-  const cedulasNoMapeadas = [];
-
-  votosRaw.forEach(({ cedula, respuesta }) => {
-    //const centro = centroPorCedula[cedula?.toString()]; 
-    const centro = centroPorCedula[cedula?.toString().padStart(8, '0')];
-    if (!centro) {
-      cedulasNoMapeadas.push(cedula);
-      return;
-    }
-
-    console.log('🗝️ Cédulas mapeadas:', Object.keys(centroPorCedula));
-
-    votosPorCentro[centro] ??= { total: 0, si: 0, no: 0, nose: 0 };
-    votosPorCentro[centro].total++;
-    const r = respuesta?.toLowerCase();
-    if (['si', 'no', 'nose'].includes(r)) votosPorCentro[centro][r]++;
-  });
-
-  // 🧾 Mostrar cédulas sin asignación de centro
+  // 🧾 Mostrar cédulas sin centro asignado
   if (cedulasNoMapeadas.length > 0) {
     console.warn(`⚠️ ${cedulasNoMapeadas.length} cédulas no fueron asociadas a ningún centro:\n` +
       cedulasNoMapeadas.map(c => ` - ${c}`).join('\n'));
   }
 
-  // 5️⃣ Actualizar cada centro
+  // 4️⃣ Actualizar cada centro en resumen_totalizado
   for (const { id, codigo_centro } of centros) {
     const { count: electCount } = await supabase
       .from('datos')
@@ -113,7 +93,7 @@ export async function generarResumenTotalizado() {
       .eq('id', id);
   }
 
-  // 6️⃣ Subtotales por parroquia
+  // 5️⃣ Subtotales por parroquia
   const { data: actualizados } = await supabase
     .from('resumen_totalizado')
     .select('*')
@@ -147,7 +127,7 @@ export async function generarResumenTotalizado() {
       .match({ parroquia: pq, codigo_centro: '0' });
   }
 
-  // 7️⃣ Total general
+  // 6️⃣ Total general
   const tot = Object.values(agrupado).reduce(
     (acc, v) => ({
       elect: acc.elect + v.elect,
