@@ -1,63 +1,57 @@
-//📂 generarPDFResumen.js
-
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import supabase from './supabase.js';
-import { enviarDocumento } from './utils.js'; // Asegúrate de que esta función esté incluida
+import { enviarDocumento } from './utils.js';
 
 export async function crearPDFResumen(chatId) {
   try {
     const doc = new jsPDF('landscape', 'mm', 'a4');
     const margin = 10;
 
-    // 🧠 1. Leer datos de resumen_totalizado
-    const { data: centros, error } = await supabase
+    // 📥 1. Leer datos de resumen_totalizado
+    const { data: resumen, error } = await supabase
       .from('resumen_totalizado')
-      .select('codigo_centro, parroquia, si, no, nose, porcentaje_si, porcentaje_no, porcentaje_nose')
+      .select('codigo_centro, nombre_centro, parroquia, si, no, nose, porcentaje_si, porcentaje_no, porcentaje_nose, porcentaje_participacion')
       .eq('es_subtotal', false);
 
     if (error) throw error;
 
-    // 📊 2. Calcular totales generales
-    const totalSi = centros.reduce((sum, c) => sum + c.si, 0);
-    const totalNo = centros.reduce((sum, c) => sum + c.no, 0);
-    const totalNs = centros.reduce((sum, c) => sum + c.nose, 0);
-    const total = totalSi + totalNo + totalNs;
+    // 🔍 2. Separar fila TOTAL GENERAL y centros normales
+    const totalGeneral = resumen.find(r => r.nombre_centro === 'TOTAL GENERAL');
+    const centros = resumen.filter(r => r.nombre_centro !== 'TOTAL GENERAL');
 
-    // 🔥 3. Termómetro de opinión
-    const termometroData = [
-      { label: 'No', color: '#C62828', porcentaje: ((totalNo / total) * 100).toFixed(1) },
-      { label: 'No sé', color: '#FBC02D', porcentaje: ((totalNs / total) * 100).toFixed(1) },
-      { label: 'Sí', color: '#43A047', porcentaje: ((totalSi / total) * 100).toFixed(1) },
-    ];
+    // 🌡️ 3. Termómetro de participación (desde TOTAL GENERAL)
+    if (totalGeneral) {
+      const pPart = parseFloat(totalGeneral.porcentaje_participacion).toFixed(1);
+      const ancho = pPart * 2.5;
+      const y = 25;
 
-    termometroData.forEach((val, i) => {
-      const ancho = parseFloat(val.porcentaje) * 2.5;
-      const y = 30 + i * 10;
-      doc.setFillColor(val.color);
-      doc.rect(margin, y, ancho, 7, 'F');
-      doc.setTextColor(0);
-      doc.text(`${val.label}: ${val.porcentaje}%`, margin + ancho + 2, y + 5);
-    });
+      doc.setFontSize(12);
+      doc.setTextColor(40);
+      doc.text(`Participación Total: ${pPart}%`, margin, y - 6);
+      doc.setFillColor('#1976D2');
+      doc.rect(margin, y, ancho, 10, 'F');
+    }
 
-    // 📉 4. Tabla resumen por centro
-    const tablaBody = centros.map((c) => [
+    // 📊 4. Tabla resumen por centro
+    const tablaBody = centros.map(c => [
       c.codigo_centro,
+      c.nombre_centro,
       c.parroquia,
       c.si,
       c.no,
       c.nose,
       `${c.porcentaje_si}%`,
       `${c.porcentaje_no}%`,
-      `${c.porcentaje_nose}%`,
+      `${c.porcentaje_nose}%`
     ]);
 
     autoTable(doc, {
-      head: [['Centro', 'Parroquia', 'Sí', 'No', 'No sé', '% Sí', '% No', '% No sé']],
+      head: [['Código', 'Centro', 'Parroquia', 'Sí', 'No', 'No sé', '% Sí', '% No', '% No sé']],
       body: tablaBody,
-      startY: 70,
+      startY: 50,
       styles: { fontSize: 8 },
-      headStyles: { fillColor: [67, 160, 71] },
+      headStyles: { fillColor: [33, 150, 243] },
     });
 
     // 📤 5. Exportar y enviar
