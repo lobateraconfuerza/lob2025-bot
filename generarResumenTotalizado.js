@@ -33,10 +33,11 @@ export async function generarResumenTotalizado() {
 
   const centroPorCedula = {};
   cedulaCentroMap?.forEach(({ cedula, codigo_centro }) => {
-    if (cedula != null) {
-      centroPorCedula[cedula.toString()] = codigo_centro;
+    if (cedula != null && codigo_centro) {
+      centroPorCedula[cedula.toString()] = codigo_centro.toString().trim();
     }
   });
+
 
   // 4️⃣ Agrupar votos por centro
   const votosPorCentro = {};
@@ -55,8 +56,10 @@ export async function generarResumenTotalizado() {
     if (['si', 'no', 'nose'].includes(r)) votosPorCentro[centro][r]++;
   });
 
+  // 🧾 Mostrar cédulas sin asignación de centro
   if (cedulasNoMapeadas.length > 0) {
-    console.warn(`⚠️ Cédulas sin centro asignado:`, cedulasNoMapeadas);
+    console.warn(`⚠️ ${cedulasNoMapeadas.length} cédulas no fueron asociadas a ningún centro:\n` +
+      cedulasNoMapeadas.map(c => ` - ${c}`).join('\n'));
   }
 
   // 5️⃣ Actualizar cada centro
