@@ -1,4 +1,3 @@
-// utils.js – Funciones de utilidad para el bot Lobatera + Fuerte
 import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 import FormData from 'form-data';
@@ -13,10 +12,7 @@ export const headers = {
 
 // 📤 Enviar mensajes
 export async function enviarMensaje(chatId, texto, modo = null, botones = null) {
-  if (!chatId || !texto) {
-    console.error('🚫 Falta chatId o texto para enviarMensaje');
-    return;
-  }
+  if (!chatId || !texto) return console.error('🚫 Falta chatId o texto para enviarMensaje');
 
   const payload = { chat_id: chatId, text: texto };
   if (modo) payload.parse_mode = modo;
@@ -29,9 +25,7 @@ export async function enviarMensaje(chatId, texto, modo = null, botones = null) 
       body: JSON.stringify(payload)
     });
     const result = await response.json();
-    if (!result.ok) {
-      console.error('🚨 Telegram no envió mensaje:', result.description);
-    }
+    if (!result.ok) console.error('🚨 Telegram no envió mensaje:', result.description);
   } catch (error) {
     console.error('💥 Error al enviar mensaje:', error.message);
   }
@@ -39,10 +33,7 @@ export async function enviarMensaje(chatId, texto, modo = null, botones = null) 
 
 // 🧼 Eliminar botones
 export async function eliminarBotones(chatId, messageId) {
-  if (!chatId || !messageId) {
-    console.error('🚫 chatId o messageId faltante para eliminarBotones');
-    return;
-  }
+  if (!chatId || !messageId) return console.error('🚫 chatId o messageId faltante para eliminarBotones');
 
   try {
     await fetch(`${TELEGRAM_API}/editMessageReplyMarkup`, {
@@ -79,12 +70,9 @@ export function limpiarTextoMarkdown(texto) {
     .replace(/>/g, '›');
 }
 
-// 📤 Enviar archivo (Excel o PDF)
+// 📤 Enviar archivo (Excel o PDF desde Buffer)
 export async function enviarArchivo(chatId, buffer, nombreArchivo) {
-  if (!chatId || !buffer || !nombreArchivo) {
-    console.error('🚫 Parámetros incompletos para enviarArchivo');
-    return;
-  }
+  if (!chatId || !buffer || !nombreArchivo) return console.error('🚫 Parámetros incompletos para enviarArchivo');
 
   const form = new FormData();
   form.append('chat_id', chatId);
@@ -97,11 +85,30 @@ export async function enviarArchivo(chatId, buffer, nombreArchivo) {
       headers: form.getHeaders()
     });
     const result = await response.json();
-    if (!result.ok) {
-      console.error('🚨 Telegram no envió el archivo:', result.description);
-    }
+    if (!result.ok) console.error('🚨 Telegram no envió el archivo:', result.description);
   } catch (error) {
     console.error('💥 Error al enviar archivo:', error.message);
+  }
+}
+
+// 📄 Enviar documento generado como Blob o File
+export async function enviarDocumento(chatId, archivo) {
+  if (!chatId || !archivo) return console.error('🚫 Parámetros incompletos para enviarDocumento');
+
+  const form = new FormData();
+  form.append('chat_id', chatId);
+  form.append('document', archivo);
+
+  try {
+    const response = await fetch(`${TELEGRAM_API}/sendDocument`, {
+      method: 'POST',
+      body: form,
+      headers: form.getHeaders()
+    });
+    const result = await response.json();
+    if (!result.ok) console.error('🚨 Telegram no envió el documento:', result.description);
+  } catch (error) {
+    console.error('💥 Error al enviar documento:', error.message);
   }
 }
 
