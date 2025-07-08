@@ -27,25 +27,31 @@ export async function generarResumenTotalizado() {
   }
 
   // 3️⃣ Obtener mapeo cédula → centro
-  const { data: cedulaCentroMap } = await supabase
-    .from('datos')
-    .select('cedula, codigo_centro')
-    .limit(9999); // ← 💡 forzamos a traer todos
+  votosPorCentro = {};
+  cedulasNoMapeadas = [];
 
-  const centroPorCedula = {};
-  cedulaCentroMap?.forEach(({ cedula, codigo_centro }) => {
-    if (cedula != null && codigo_centro) {
-      //centroPorCedula[cedula.toString()] = codigo_centro.toString().trim();
-      const cedulaKey = cedula.toString().padStart(8, '0');
-      centroPorCedula[cedulaKey] = codigo_centro.toString().trim();
+  for (const { cedula, respuesta } of votosRaw) {
+    const cedulaKey = cedula?.toString().padStart(8, '0');
+
+    const { data: centroData, error } = await supabase
+      .from('datos')
+      .select('codigo_centro')
+      .eq('cedula', cedulaKey)
+      .maybeSingle();
+
+    const centro = centroData?.codigo_centro?.toString().trim();
+
+    if (!centro) {
+      cedulasNoMapeadas.push(cedulaKey);
+      continue;
     }
-  });
 
-  ['12642865', '15241918', '12755627', '31859249'].forEach(c => {
-    const centro = centroPorCedula[c];
-    console.log(`🔍 Cédula ${c} → centro detectado:`, centro ?? '❌ no encontrado');
-  });
+    votosPorCentro[centro] ??= { total: 0, si: 0, no: 0, nose: 0 };
+    votosPorCentro[centro].total++;
 
+    const r = respuesta?.toLowerCase();
+    if (['si', 'no', 'nose'].includes(r)) votosPorCentro[centro][r]++;
+  }
 
   // 4️⃣ Agrupar votos por centro
   const votosPorCentro = {};
