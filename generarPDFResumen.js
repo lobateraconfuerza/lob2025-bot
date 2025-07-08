@@ -1,5 +1,7 @@
+//📂 generarPDFResumen.js
+
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import 'jspdf-autotable'; // ✅ se importa sin asignar a variable
 import supabase from './supabase.js';
 import { enviarDocumento } from './utils.js';
 
@@ -11,7 +13,9 @@ export async function crearPDFResumen(chatId) {
     // 📥 1. Leer datos de resumen_totalizado
     const { data: resumen, error } = await supabase
       .from('resumen_totalizado')
-      .select('codigo_centro, nombre_centro, parroquia, si, no, nose, porcentaje_si, porcentaje_no, porcentaje_nose, porcentaje_participacion')
+      .select(
+        'codigo_centro, nombre_centro, parroquia, si, no, nose, porcentaje_si, porcentaje_no, porcentaje_nose, porcentaje_participacion'
+      )
       .eq('es_subtotal', false);
 
     if (error) throw error;
@@ -46,20 +50,21 @@ export async function crearPDFResumen(chatId) {
       `${c.porcentaje_nose}%`
     ]);
 
-    autoTable(doc, {
+    doc.autoTable({
       head: [['Código', 'Centro', 'Parroquia', 'Sí', 'No', 'No sé', '% Sí', '% No', '% No sé']],
       body: tablaBody,
       startY: 50,
       styles: { fontSize: 8 },
-      headStyles: { fillColor: [33, 150, 243] },
+      headStyles: { fillColor: [33, 150, 243] }
     });
 
     // 📤 5. Exportar y enviar
     const pdfBlob = doc.output('blob');
-    const file = new File([pdfBlob], 'Resumen_Totalizado.pdf', { type: 'application/pdf' });
+    const file = new File([pdfBlob], 'Resumen_Totalizado.pdf', {
+      type: 'application/pdf'
+    });
 
     await enviarDocumento(chatId, file);
-
   } catch (err) {
     console.error('❌ Error generando PDF resumen:', err.message);
     throw err;
