@@ -1,3 +1,4 @@
+//📂 utils.js
 import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 import FormData from 'form-data';
@@ -5,8 +6,8 @@ dotenv.config();
 
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.BOT_TOKEN}`;
 export const headers = {
-  'apikey': process.env.SUPABASE_KEY,
-  'Authorization': `Bearer ${process.env.SUPABASE_KEY}`,
+  apikey: process.env.SUPABASE_KEY,
+  Authorization: `Bearer ${process.env.SUPABASE_KEY}`,
   'Content-Type': 'application/json'
 };
 
@@ -91,13 +92,25 @@ export async function enviarArchivo(chatId, buffer, nombreArchivo) {
   }
 }
 
-// 📄 Enviar documento generado como Blob o File
-export async function enviarDocumento(chatId, archivo) {
-  if (!chatId || !archivo) return console.error('🚫 Parámetros incompletos para enviarDocumento');
+// 📄 Enviar documento generado como Buffer, File o Blob
+export async function enviarDocumento(chatId, archivo, nombre = 'Resumen_Totalizado.pdf') {
+  if (!chatId || !archivo) {
+    console.error('🚫 Parámetros incompletos para enviarDocumento');
+    return;
+  }
 
   const form = new FormData();
   form.append('chat_id', chatId);
-  form.append('document', archivo);
+
+  if (archivo instanceof Buffer) {
+    form.append('document', archivo, { filename: nombre });
+  } else if (typeof archivo.arrayBuffer === 'function') {
+    const arrayBuffer = await archivo.arrayBuffer();
+    form.append('document', Buffer.from(arrayBuffer), { filename: nombre });
+  } else {
+    console.error('🚫 Tipo de archivo no soportado para enviarDocumento');
+    return;
+  }
 
   try {
     const response = await fetch(`${TELEGRAM_API}/sendDocument`, {

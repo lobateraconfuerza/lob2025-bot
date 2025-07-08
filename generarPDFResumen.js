@@ -1,7 +1,6 @@
 //📂 generarPDFResumen.js
-
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable'; // ✅ se importa sin asignar a variable
+import 'jspdf-autotable';
 import supabase from './supabase.js';
 import { enviarDocumento } from './utils.js';
 
@@ -9,6 +8,11 @@ export async function crearPDFResumen(chatId) {
   try {
     const doc = new jsPDF('landscape', 'mm', 'a4');
     const margin = 10;
+
+    // 🏛️ Encabezado institucional
+    doc.setFontSize(14);
+    doc.setTextColor(44);
+    doc.text('📊 Resumen Totalizado de Participación Ciudadana', margin, 15);
 
     // 📥 1. Leer datos de resumen_totalizado
     const { data: resumen, error } = await supabase
@@ -58,13 +62,10 @@ export async function crearPDFResumen(chatId) {
       headStyles: { fillColor: [33, 150, 243] }
     });
 
-    // 📤 5. Exportar y enviar
-    const pdfBlob = doc.output('blob');
-    const file = new File([pdfBlob], 'Resumen_Totalizado.pdf', {
-      type: 'application/pdf'
-    });
+    // 📤 5. Exportar y enviar (para entorno Node.js)
+    const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+    await enviarDocumento(chatId, pdfBuffer, 'Resumen_Totalizado.pdf');
 
-    await enviarDocumento(chatId, file);
   } catch (err) {
     console.error('❌ Error generando PDF resumen:', err.message);
     throw err;
