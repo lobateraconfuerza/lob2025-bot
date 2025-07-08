@@ -35,7 +35,9 @@ export async function generarResumenTotalizado() {
   const centroPorCedula = {};
   cedulaCentroMap?.forEach(({ cedula, codigo_centro }) => {
     if (cedula != null && codigo_centro) {
-      centroPorCedula[cedula.toString()] = codigo_centro.toString().trim();
+      //centroPorCedula[cedula.toString()] = codigo_centro.toString().trim();
+      const cedulaKey = cedula.toString().padStart(8, '0');
+      centroPorCedula[cedulaKey] = codigo_centro.toString().trim();
     }
   });
 
@@ -50,11 +52,14 @@ export async function generarResumenTotalizado() {
   const cedulasNoMapeadas = [];
 
   votosRaw.forEach(({ cedula, respuesta }) => {
-    const centro = centroPorCedula[cedula?.toString()];
+    //const centro = centroPorCedula[cedula?.toString()]; 
+    const centro = centroPorCedula[cedula?.toString().padStart(8, '0')];
     if (!centro) {
       cedulasNoMapeadas.push(cedula);
       return;
     }
+
+    console.log('🗝️ Cédulas mapeadas:', Object.keys(centroPorCedula));
 
     votosPorCentro[centro] ??= { total: 0, si: 0, no: 0, nose: 0 };
     votosPorCentro[centro].total++;
