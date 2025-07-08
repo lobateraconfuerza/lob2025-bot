@@ -29,13 +29,19 @@ export async function generarResumenTotalizado() {
   // 3️⃣ Obtener mapeo cédula → centro
   const { data: cedulaCentroMap } = await supabase
     .from('datos')
-    .select('cedula, codigo_centro');
+    .select('cedula, codigo_centro')
+    .limit(9999); // ← 💡 forzamos a traer todos
 
   const centroPorCedula = {};
   cedulaCentroMap?.forEach(({ cedula, codigo_centro }) => {
     if (cedula != null && codigo_centro) {
       centroPorCedula[cedula.toString()] = codigo_centro.toString().trim();
     }
+  });
+
+  ['12642865', '15241918', '12755627', '31859249'].forEach(c => {
+    const centro = centroPorCedula[c];
+    console.log(`🔍 Cédula ${c} → centro detectado:`, centro ?? '❌ no encontrado');
   });
 
 
