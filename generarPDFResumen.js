@@ -64,6 +64,12 @@ export async function crearPDFResumen(chatId) {
 
     // 📤 5. Exportar y enviar (para entorno Node.js)
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+    // 🔍 Validación: ¿está vacío o inválido?
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      console.error('🚨 El PDF generado está vacío o inválido');
+      return;
+    }
+
     await enviarDocumento(chatId, pdfBuffer, 'Resumen_Totalizado.pdf');
 
   } catch (err) {

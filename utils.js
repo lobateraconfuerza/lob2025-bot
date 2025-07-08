@@ -106,6 +106,7 @@ export async function enviarDocumento(chatId, archivo, nombre = 'Resumen_Totaliz
     form.append('document', archivo, { filename: nombre });
   } else if (typeof archivo.arrayBuffer === 'function') {
     const arrayBuffer = await archivo.arrayBuffer();
+    console.log('✅ Generando PDF... tamaño aproximado:', doc.output().length);
     form.append('document', Buffer.from(arrayBuffer), { filename: nombre });
   } else {
     console.error('🚫 Tipo de archivo no soportado para enviarDocumento');
