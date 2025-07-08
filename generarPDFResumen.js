@@ -54,24 +54,31 @@ export async function crearPDFResumen(chatId) {
       `${c.porcentaje_nose}%`
     ]);
 
-    doc.autoTable({
-      head: [['Código', 'Centro', 'Parroquia', 'Sí', 'No', 'No sé', '% Sí', '% No', '% No sé']],
-      body: tablaBody,
-      startY: 50,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [33, 150, 243] }
-    });
+    try {
+      doc.autoTable({
+        head: [['Código', 'Centro', 'Parroquia', 'Sí', 'No', 'No sé', '% Sí', '% No', '% No sé']],
+        body: tablaBody,
+        startY: 50,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [33, 150, 243] }
+      });
+    } catch (tableError) {
+      console.error('🚨 Error generando la tabla con autoTable:', tableError.message);
+      return;
+    }
 
     // 📤 5. Exportar y enviar (para entorno Node.js)
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+
     // 🔍 Validación: ¿está vacío o inválido?
     if (!pdfBuffer || pdfBuffer.length === 0) {
       console.error('🚨 El PDF generado está vacío o inválido');
       return;
     }
 
-    await enviarDocumento(chatId, pdfBuffer, 'Resumen_Totalizado.pdf');
+    console.log('📦 PDF generado correctamente. Tamaño:', pdfBuffer.length, 'bytes');
 
+    await enviarDocumento(chatId, pdfBuffer, 'Resumen_Totalizado.pdf');
   } catch (err) {
     console.error('❌ Error generando PDF resumen:', err.message);
     throw err;
