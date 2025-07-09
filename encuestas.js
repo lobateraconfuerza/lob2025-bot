@@ -71,7 +71,7 @@ export async function procesarCedula(chatId, tipo, cedula) {
 
   if (elector) {
     const edad = calcularEdad(elector.fechanac);
-    const texto = `*Lobatera + Fuerte* 💪🇻🇪\n*CÉDULA:* ${tipo}${cedula}\n*NOMBRES Y APELLIDOS:* ${limpiarTextoMarkdown(elector.elector)}\n*EDAD:* ${edad} años\n*CENTRO ELECTORAL:* ${limpiarTextoMarkdown(elector.nombre_centro)}\n\n¿Está usted de acuerdo en formar parte de este equipo para hacer que el Municipio Lobatera sea más Fuerte?`;
+    const texto = `*Lobatera + Fuerte* 💪🇻🇪\n*CÉDULA:* ${tipo}${cedula}\n*NOMBRES Y APELLIDOS:* ${limpiarTextoMarkdown(elector.elector)}\n*EDAD:* ${edad} años\n*CENTRO ELECTORAL:* ${limpiarTextoMarkdown(elector.nombre_centro)}\n\n¿Está usted de acuerdo en asistir y apoyar a Natalia Chacón y al equipo de Concejales el proximo 27 de Julio para hacer de Lobatera un Municipio + FUERTE?`;
 
     const botones = {
       inline_keyboard: [
