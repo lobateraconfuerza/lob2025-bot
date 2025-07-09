@@ -8,7 +8,7 @@ export async function crearExcelResumen(chatId) {
     const { data: resumen, error } = await supabase
       .from('resumen_totalizado')
       .select(
-        'codigo_centro, nombre_centro, parroquia, si, no, nose, porcentaje_si, porcentaje_no, porcentaje_nose, porcentaje_participacion'
+        'codigo_centro, nombre_centro, parroquia, electores, si, no, nose, porcentaje_si, porcentaje_no, porcentaje_nose, porcentaje_participacion'
       )
       .eq('es_subtotal', false);
 
@@ -20,7 +20,7 @@ export async function crearExcelResumen(chatId) {
 
     // 📝 3. Encabezados
     hoja.addRow([
-      'Código', 'Centro', 'Parroquia',
+      'Código', 'Centro', 'Parroquia', 'Electores'
       'Sí', 'No', 'No sé',
       '% Sí', '% No', '% No sé', '% Participación'
     ]);
@@ -31,6 +31,7 @@ export async function crearExcelResumen(chatId) {
         registro.codigo_centro,
         registro.nombre_centro,
         registro.parroquia,
+        registro.electores,
         registro.si,
         registro.no,
         registro.nose,
