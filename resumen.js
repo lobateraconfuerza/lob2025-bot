@@ -1,15 +1,15 @@
 // resumen.js
 import { generarResumenTotalizado } from './generarResumenTotalizado.js';
-import { crearPDFResumen } from './generarPDFResumen.js'; // <-- NUEVO
+import { crearExcelResumen } from './generarExcelResumen.js'; // <-- nuevo
 import { enviarMensaje } from './utils.js';
 
 export async function resumen(chatId) {
   try {
-    await generarResumenTotalizado(); // 1️⃣ Actualiza los datos
-    await crearPDFResumen();          // 2️⃣ Genera y guarda el PDF con gráficos
-    await enviarMensaje(chatId, '✅ La totalización y el resumen gráfico fueron generados correctamente.');
+    await generarResumenTotalizado();   // 1️⃣ ya lo calculaste
+    await crearExcelResumen(chatId);    // 2️⃣ Genera y envía el Excel
+    await enviarMensaje(chatId, '✅ Totalización y hoja Excel enviada correctamente.');
   } catch (err) {
-    console.error('❌ Error al generar el resumen:', err);
-    await enviarMensaje(chatId, '⚠️ Ocurrió un error al generar la totalización o el resumen gráfico.');
+    console.error('❌ Error al generar resumen:', err);
+    await enviarMensaje(chatId, '⚠️ Ocurrió un error al generar o enviar el resumen en Excel.');
   }
 }
