@@ -20,7 +20,7 @@ export async function crearExcelResumen(chatId) {
 
     // 📝 3. Encabezados
     hoja.addRow([
-      'Código', 'Centro', 'Parroquia', 'Electores'
+      'Código', 'Centro', 'Parroquia', 'Electores',
       'Sí', 'No', 'No sé',
       '% Sí', '% No', '% No sé', '% Participación'
     ]);
