@@ -71,7 +71,7 @@ app.post('/', async (req, res) => {
       if (!cedula || !/^\d+$/.test(cedula)) {
         await enviarMensaje(
           chatId,
-          `👋 Bienvenido al *Bot Lobatera + Fuerte*\n\nPara comenzar, escribe tu cédula después del comando:\n\nEjemplo: \`V12345678\`\n\nEstamos construyendo comunidad con tecnología y convicción 🇻🇪`,
+          `👋 Bienvenido al *Bot Lobatera + Fuerte*\n\nPara comenzar, escribe tu cédula después de V o E:\n\nEjemplo: \`V12345678 ó E84456789\`\n\nEstamos construyendo comunidad con tecnología y convicción 🇻🇪`,
           'Markdown'
         );
         return;
